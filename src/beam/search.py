@@ -27,10 +27,7 @@ class Hypothesis(object):
         self.tokens = tokens
         self.prob = prob
         self.state = state
-        if score is None:
-            self.score = math.log(prob[-1])
-        else:
-            self.score = score
+        self.score = math.log(prob[-1]) if score is None else score
 
     def extend_(self, token, prob, new_state):
         """Extend the hypothesis with result from latest step.
@@ -42,16 +39,19 @@ class Hypothesis(object):
         Returns:
           New Hypothesis with the results from latest step.
         """
-        return Hypothesis(self.tokens+[token], self.prob+[prob],
-                            new_state, self.score + math.log(prob))
+        tokens = self.tokens + [token]
+        probs = self.prob + [prob]
+        score = self.score + math.log(prob)
+        return Hypothesis(tokens, probs, new_state, score)
 
     @property
     def latest_token(self):
         return self.tokens[-1]
 
     def __str__(self):
-        return ('Hypothesis(prob = %.4f, tokens = %s)' % (self.prob,
-                                                              self.tokens))
+        return ('Hypothesis(prob = {:4f}, tokens = {})'.format(
+                        self.prob, self.tokens)
+                )
 
 
 class BeamSearch(object):
@@ -111,13 +111,14 @@ class BeamSearch(object):
                         label_probs = dy.softmax((w * dy.concatenate(
                                             [decode_output, context])) + b)
                         probs = label_probs.npvalue()
+                        import pdb; pdb.set_trace()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]
                         all_hyps.extend([hyp.extend_(idx, prob, new_state)
                                     for idx, prob in zip(top_ids, top_probs)])
                     hyps = []
 
-                    for h in self.best_hyps(self.sort_hyps(all_hyps)):
+                    for h in self.best_hyps(all_hyps):
                         # Filter and collect any hypotheses that have the end token.
                         if h.latest_token == self._end_token and len(h.tokens)>2:
                             # Pull the hypothesis off the beam
@@ -131,25 +132,16 @@ class BeamSearch(object):
                         else:
                             # Otherwise continue to the extend the hypothesis.
                             hyps.append(h)
-            hyps_per_word = self.best_hyps(self.sort_hyps(complete_hyps))
+            hyps_per_word = self.best_hyps(complete_hyps)
             hyps_per_sentence.append([(h.tokens[1:-1], h.score) for h in hyps_per_word])
         return hyps_per_sentence
 
-    def sort_hyps(self, hyps):
-        """Sort the hyps based on probs.
-        Args:
-          hyps: A list of hypothesis.
-        Returns:
-          hyps: A list of sorted hypothesis from highest prob to lowest
-        """
-        return sorted(hyps, key=lambda h: h.score, reverse=True)
-
-    def best_hyps(self, hyp_sort):
+    def best_hyps(self, hyps):
         """return top <beam_size> hyps.
 
         Args:
-          hyp_sort: A list of sorted hypothesis.
+          hyps: A list of hypothesis.
         Returns:
           hyps: A sub list of top <beam_size> hyps.
         """
-        return hyp_sort[:self._beam_size]
+        return sorted(hyps, key=lambda h: h.score, reverse=True)[:self._beam_size]
