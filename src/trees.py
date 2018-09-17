@@ -13,6 +13,11 @@ class InternalTreebankNode(TreebankNode):
         assert children
         self.children = tuple(children)
 
+        for child in self.children:
+            child.parent = self
+
+        self.parent = None
+
     def linearize(self):
         return "({} {})".format(
             self.label, " ".join(child.linearize() for child in self.children))
@@ -37,6 +42,18 @@ class InternalTreebankNode(TreebankNode):
 
         return InternalParseNode(tuple(sublabels), children)
 
+    def myconvert(self, dependancy, index=0):
+        tree = self
+        children = []
+        for child in tree.children:
+            try:
+                children.append(child.myconvert(dependancy, index=index))
+            except:
+                import pdb; pdb.set_trace()
+            index = children[-1].right
+
+        return InternalMyParseNode(tree.label, children)
+
 class LeafTreebankNode(TreebankNode):
     def __init__(self, tag, word):
         assert isinstance(tag, str)
@@ -44,6 +61,8 @@ class LeafTreebankNode(TreebankNode):
 
         assert isinstance(word, str)
         self.word = word
+
+        self.parent = None
 
     def linearize(self):
         return "({} {})".format(self.tag, self.word)
@@ -53,6 +72,9 @@ class LeafTreebankNode(TreebankNode):
 
     def convert(self, index=0):
         return LeafParseNode(index, self.tag, self.word)
+
+    def myconvert(self, dependancy, index=0):
+        return LeafMyParseNode(index, self.tag, self.word)(dependancy[index])
 
 class ParseNode(object):
     pass
@@ -128,6 +150,67 @@ class LeafParseNode(ParseNode):
     def convert(self):
         return LeafTreebankNode(self.tag, self.word)
 
+
+class MyParseNode(object):
+    pass
+
+class InternalMyParseNode(MyParseNode):
+    def __init__(self, label, children):
+        assert isinstance(label, str)
+        assert label
+        self.label = label
+
+        assert isinstance(children, collections.abc.Sequence)
+        assert all(isinstance(child, MyParseNode) for child in children)
+        assert children
+        assert all(
+            left.right == right.left
+            for left, right in zip(children, children[1:]))
+        self.children = tuple(children)
+
+        for child in self.children:
+            child.parent = self
+
+        self.left = children[0].left
+        self.right = children[-1].right
+
+        self.parent = None
+
+    def leaves(self):
+        for child in self.children:
+            yield from child.leaves()
+
+    def convert(self):
+        children = [child.convert() for child in self.children]
+        tree = InternalTreebankNode(self.label, children)
+        # for sublabel in reversed(self.label[:-1]):
+        #     tree = InternalTreebankNode(sublabel, [tree])
+        return tree
+
+class LeafMyParseNode(MyParseNode):
+    def __init__(self, index, tag, word):
+        assert isinstance(index, int)
+        assert index >= 0
+        self.left = index
+        self.right = index + 1
+
+        assert isinstance(tag, str)
+        self.tag = tag
+
+        assert isinstance(word, str)
+        self.word = word
+
+    def __call__(self, dependency):
+        assert isinstance(dependency, int)
+        self.dependancy = dependency
+        return self
+
+    def leaves(self):
+        yield self
+
+    def convert(self):
+        return LeafTreebankNode(self.tag, self.word)
+
 def load_trees(path, strip_top=True):
     with open(path) as infile:
         tokens = infile.read().replace("(", " ( ").replace(")", " ) ").split()
@@ -136,6 +219,7 @@ def load_trees(path, strip_top=True):
         trees = []
 
         while index < len(tokens) and tokens[index] == "(":
+
             paren_count = 0
             while tokens[index] == "(":
                 index += 1
@@ -156,7 +240,6 @@ def load_trees(path, strip_top=True):
                 assert tokens[index] == ")"
                 index += 1
                 paren_count -= 1
-
         return trees, index
 
     trees, index = helper(0)
@@ -167,5 +250,6 @@ def load_trees(path, strip_top=True):
             if tree.label == "TOP":
                 assert len(tree.children) == 1
                 trees[i] = tree.children[0]
+                trees[i].parent = None
 
     return trees

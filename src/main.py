@@ -2,6 +2,7 @@ import argparse
 import itertools
 import os.path
 import time
+from subprocess import Popen, DEVNULL, PIPE
 
 import dynet as dy
 import numpy as np
@@ -21,6 +22,23 @@ def format_elapsed(start_time):
         elapsed_string = "{}d{}".format(days, elapsed_string)
     return elapsed_string
 
+def get_dependancies(fin, path_penn="../POST/code/pennconverter.jar"):
+    """ Creates dependancy dictionary for each intput file"""
+
+    command = 'java -jar {} < {} -splitSlash=false'.format(path_penn, fin)
+    proc = Popen(command, shell=True, stdout=PIPE, stderr=DEVNULL)
+    results = proc.stdout.readlines()
+    dependancies = []
+    dependancy = []
+    for res in results:
+        res = res.decode('utf8')
+        if res == '\n':
+            dependancies.append(dependancy)
+            dependancy = []
+        else:
+            dependancy.append(int(res.split()[6]))
+    return dependancies
+
 def run_train(args):
     if args.numpy_seed is not None:
         print("Setting numpy random seed to {}...".format(args.numpy_seed))
@@ -35,7 +53,11 @@ def run_train(args):
     print("Loaded {:,} development examples.".format(len(dev_treebank)))
 
     print("Processing trees for training...")
-    train_parse = [tree.convert() for tree in train_treebank]
+    if args.parser_type != 'my':
+        train_parse = [tree.convert() for tree in train_treebank]
+    else:
+        dependancies = get_dependancies(args.train_path, '../POST/code/pennconverter.jar')
+        train_parse = [tree.myconvert(dep) for tree, dep in zip(train_treebank, dependancies)]
 
     print("Constructing vocabularies...")
 
@@ -49,7 +71,11 @@ def run_train(args):
     word_vocab.index(parse.UNK)
 
     label_vocab = vocabulary.Vocabulary()
-    label_vocab.index(())
+    if args.parser_type != 'my':
+        label_vocab.index(())
+    else:
+        label_vocab.index(parse.START)
+        label_vocab.index(parse.STOP)
 
     for tree in train_parse:
         nodes = [tree]
@@ -58,6 +84,14 @@ def run_train(args):
             if isinstance(node, trees.InternalParseNode):
                 label_vocab.index(node.label)
                 nodes.extend(reversed(node.children))
+            elif isinstance(node, trees.InternalMyParseNode):
+                nodes.extend(reversed(node.children))
+            elif isinstance(node, trees.LeafMyParseNode):
+                node.collapse(True)
+                for l in node.label:
+                    label_vocab.index(l)
+                tag_vocab.index(node.tag)
+                word_vocab.index(node.word)
             else:
                 tag_vocab.index(node.tag)
                 word_vocab.index(node.word)
@@ -92,6 +126,21 @@ def run_train(args):
             args.lstm_dim,
             args.label_hidden_dim,
             args.split_hidden_dim,
+            args.dropout,
+        )
+    elif args.parser_type == "my":
+        parser = parse.MyParser(
+            model,
+            tag_vocab,
+            word_vocab,
+            label_vocab,
+            args.tag_embedding_dim,
+            args.word_embedding_dim,
+            args.label_embedding_dim,
+            args.lstm_layers,
+            args.lstm_dim,
+            args.label_hidden_dim,
+            args.attention_dim,
             args.dropout,
         )
     else:
@@ -170,6 +219,8 @@ def run_train(args):
                 sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
                 if args.parser_type == "top-down":
                     _, loss = parser.parse(sentence, tree, args.explore)
+                elif args.parser_type == "my":
+                    _, loss = parser.parse(sentence, tree)
                 else:
                     _, loss = parser.parse(sentence, tree)
                 batch_losses.append(loss)
@@ -251,11 +302,13 @@ def main():
     for arg in dynet_args:
         subparser.add_argument(arg)
     subparser.add_argument("--numpy-seed", type=int)
-    subparser.add_argument("--parser-type", choices=["top-down", "chart"], required=True)
+    subparser.add_argument("--parser-type", choices=["top-down", "chart", "my"], required=True)
     subparser.add_argument("--tag-embedding-dim", type=int, default=50)
     subparser.add_argument("--word-embedding-dim", type=int, default=100)
+    subparser.add_argument("--label-embedding-dim", type=int, default=100)
     subparser.add_argument("--lstm-layers", type=int, default=2)
     subparser.add_argument("--lstm-dim", type=int, default=250)
+    subparser.add_argument("--attention-dim", type=int, default=250)
     subparser.add_argument("--label-hidden-dim", type=int, default=250)
     subparser.add_argument("--split-hidden-dim", type=int, default=250)
     subparser.add_argument("--dropout", type=float, default=0.4)

@@ -363,3 +363,126 @@ class ChartParser(object):
             return tree, loss
         else:
             return tree, score
+
+class MyParser(object):
+    def __init__(
+            self,
+            model,
+            tag_vocab,
+            word_vocab,
+            label_vocab,
+            tag_embedding_dim,
+            word_embedding_dim,
+            label_embedding_dim,
+            lstm_layers,
+            lstm_dim,
+            label_hidden_dim,
+            attention_dim,
+            dropout,
+    ):
+        self.spec = locals()
+        self.spec.pop("self")
+        self.spec.pop("model")
+        self.model = model.add_subcollection("Parser")
+        self.tag_vocab = tag_vocab
+        self.word_vocab = word_vocab
+        self.label_vocab = label_vocab
+        self.lstm_dim = lstm_dim
+
+        self.tag_embeddings = self.model.add_lookup_parameters(
+            (tag_vocab.size, tag_embedding_dim))
+        self.word_embeddings = self.model.add_lookup_parameters(
+            (word_vocab.size, word_embedding_dim))
+
+        embedding_dim = tag_embedding_dim + word_embedding_dim
+        self.enc_lstm = dy.BiRNNBuilder(
+            lstm_layers,
+            embedding_dim,
+            2 * lstm_dim,
+            self.model,
+            dy.VanillaLSTMBuilder)
+
+        self.label_embeddings = self.model.add_lookup_parameters(
+            (label_vocab.size, 2 * lstm_dim))
+
+        self.dec_lstm = dy.LSTMBuilder(
+            1,
+            2 * lstm_dim,
+            embedding_dim + 2 * lstm_dim,
+            self.model)
+
+        STATE_SIZE = embedding_dim + 2 * lstm_dim
+        ATTENTION_SIZE = STATE_SIZE + attention_dim
+        self.attention_w1 = self.model.add_parameters((attention_dim, STATE_SIZE))
+        self.attention_w2 = self.model.add_parameters((attention_dim, STATE_SIZE))
+        self.attention_v1 = self.model.add_parameters((attention_dim))
+        self.attention_v2 = self.model.add_parameters((attention_dim))
+        self.decoder_w = self.model.add_parameters((label_vocab.size, 2 * STATE_SIZE))
+        self.decoder_b = self.model.add_parameters((label_vocab.size))
+
+        self.dropout = dropout
+
+    def param_collection(self):
+        return self.model
+
+    @classmethod
+    def from_spec(cls, spec, model):
+        return cls(model, **spec)
+
+    def parse(self, sentence, gold=None):
+        is_train = gold is not None
+
+        if is_train:
+            self.enc_lstm.set_dropout(self.dropout)
+            self.dec_lstm.set_dropout(self.dropout)
+        else:
+            self.enc_lstm.disable_dropout()
+            self.dec_lstm.disable_dropout()
+
+        embeddings = []
+        for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
+            tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
+            if word not in (START, STOP):
+                count = self.word_vocab.count(word)
+                if not count or (is_train and np.random.rand() < 1 / (1 + count)):
+                    word = UNK
+            word_embedding = self.word_embeddings[self.word_vocab.index(word)]
+            embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
+
+        lstm_outputs = self.enc_lstm.transduce(embeddings)
+
+        decode_init_states = []
+        for embedding, lstm_output in zip(embeddings, lstm_outputs):
+            decode_init_states.append(dy.concatenate([embedding, lstm_output]))
+        encode_outputs = decode_init_states[1:-1]
+        encode_outputs_col = dy.concatenate_cols(encode_outputs)
+
+        w1 = dy.parameter(self.attention_w1)
+        v1 = dy.parameter(self.attention_v1)
+        query = dy.transpose(dy.rectify((w1 * encode_outputs_col) + v1))
+
+        w = dy.parameter(self.decoder_w)
+        b = dy.parameter(self.decoder_b)
+        w2 = dy.parameter(self.attention_w2)
+        v2 = dy.parameter(self.attention_v2)
+
+        if is_train:
+            decode_inputs = [(START,) + leaf.label + (STOP,) for leaf in gold.leaves()]
+            loss = []
+            for encode_output, decode_input in zip(encode_outputs, decode_inputs):
+                encode_output_zeros = dy.zeros(encode_output.dim()[0])
+                intial_state = self.dec_lstm.initial_state(
+                                    [encode_output, encode_output_zeros])
+                label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
+                                    for label in decode_input[:-1]]
+                decode_output = dy.concatenate_cols(intial_state.transduce(label_embedding))
+                key = dy.rectify((w2 * decode_output) + v2)
+                alpha = dy.softmax(query * key)
+                context = encode_outputs_col * alpha
+                #TODO add res = dy.rectify(w3 * dy.concatenate([decode_output, context])) + b3)
+                label_probs = dy.softmax((w * dy.concatenate([decode_output, context])) + b)
+                n_labels = len(decode_input[1:])
+                gold_ids = [self.label_vocab.index(label) for label in decode_input[1:]]
+                e = dy.select_rows(label_probs, gold_ids)
+                loss.append(dy.average([-dy.log(e[i][i]) for i in range(n_labels)]))
+            return None, dy.average(loss)
