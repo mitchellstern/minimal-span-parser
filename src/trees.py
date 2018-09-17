@@ -54,6 +54,7 @@ class InternalTreebankNode(TreebankNode):
 
         return InternalMyParseNode(tree.label, children)
 
+
 class LeafTreebankNode(TreebankNode):
     def __init__(self, tag, word):
         assert isinstance(tag, str)
@@ -75,6 +76,7 @@ class LeafTreebankNode(TreebankNode):
 
     def myconvert(self, dependancy, index=0):
         return LeafMyParseNode(index, self.tag, self.word)(dependancy[index])
+
 
 class ParseNode(object):
     pass
