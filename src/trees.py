@@ -1,5 +1,11 @@
 import collections.abc
 
+R = '}'
+L = '{'
+CR = '>'
+CL = '<'
+ANY = '*'
+
 class TreebankNode(object):
     pass
 
@@ -189,6 +195,30 @@ class InternalMyParseNode(MyParseNode):
         #     tree = InternalTreebankNode(sublabel, [tree])
         return tree
 
+    def siblings(self):
+        return [child for child in self.parent.children if child != self]
+
+    def is_no_missing_leaves(self):
+        for leaf in self.leaves():
+            if isinstance(leaf, MissMyParseNode):
+                return False
+        return True
+
+    def combine_tree(self, node_to_merge, node_to_remove):
+        assert isinstance(node_to_merge, InternalMyParseNode)
+        assert (node_to_merge.label in [CL, CR])
+        assert len(node_to_merge.children) == 1
+        assert isinstance(node_to_remove, MissMyParseNode)
+        assert (node_to_remove in self.leaves())
+
+        node_to_merge = node_to_merge.children[0]
+        node_to_merge.parent = node_to_remove.parent
+        children = node_to_remove.siblings() + [node_to_merge]
+        children = sorted(children, key = lambda child: child.left)
+        node_to_remove.parent.children = children
+
+        return self
+
 class LeafMyParseNode(MyParseNode):
     def __init__(self, index, tag, word):
         assert isinstance(index, int)
@@ -212,6 +242,51 @@ class LeafMyParseNode(MyParseNode):
 
     def convert(self):
         return LeafTreebankNode(self.tag, self.word)
+
+    def siblings(self):
+        return [child for child in self.parent.children if child != self]
+
+    def collapse(self, no_val_gap=False):
+
+        def helper(current, sibling, no_val_gap=no_val_gap):
+            side = L if current.left > sibling.left else R
+            if no_val_gap:
+                return side+ANY
+            elif isinstance(sibling, LeafMyParseNode):
+                return side+sibling.tag
+            else:
+                return side+sibling.label
+
+        dependancy = self.dependancy
+        current = self
+        next = self.parent
+        label = [self.tag] #TODO remove this
+        while next is not None and dependancy not in (next.left+1, next.right):
+            if next.parent is None and dependancy != 0:
+                break
+            label.append(next.label)
+            label.extend([helper(current, sibling) for sibling in current.siblings()])
+            current = next
+            next = next.parent
+        if dependancy != 0:
+            side = CL if current.left > dependancy else CR
+            label.append(side)
+        self.label = tuple(label)
+
+class MissMyParseNode(MyParseNode):
+    def __init__(self, label, index = 0):
+        self.label = label
+        self.left = index
+        self.right = index + 1
+
+    def leaves(self):
+        yield self
+
+    def siblings(self):
+        return [child for child in self.parent.children if child != self]
+
+    def convert(self):
+        return LeafTreebankNode(self.label, self.label)
 
 def load_trees(path, strip_top=True):
     with open(path) as infile:

@@ -4,6 +4,8 @@ import dynet as dy
 import numpy as np
 
 import trees
+from beam.search import BeamSearch
+from astar.search import solve_tree_search
 
 START = "<START>"
 STOP = "<STOP>"
@@ -486,3 +488,30 @@ class MyParser(object):
                 e = dy.select_rows(label_probs, gold_ids)
                 loss.append(dy.average([-dy.log(e[i][i]) for i in range(n_labels)]))
             return None, dy.average(loss)
+        else:
+            bs = BeamSearch(5,
+                            self.label_vocab.index(START),
+                            self.label_vocab.index(STOP),
+                            28)
+
+            beams = bs.beam_search(encode_outputs, self.label_embeddings,
+                                    self.dec_lstm, w1, v1, w2, v2, w, b)
+            def helper(beam, leaf, index=0):
+                label = np.array(self.label_vocab.values)[beam[0]].tolist()[1:]
+                children = [trees.LeafMyParseNode(index, *leaf)]
+                while label:
+                    if not (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
+                        p_label = label[0]
+                        label = label[1:]
+                    while label and (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
+                        index += 1
+                        children.append(trees.MissMyParseNode(label[0], index))
+                        label = label[1:]
+                    children = [trees.InternalMyParseNode(p_label, children)]
+                return (children[-1], beam[1])
+
+            beams = [[helper(b, word, i) for b in beam]
+                        for i, (beam, word) in enumerate(zip(beams, sentence))]
+
+            tree =  solve_tree_search(beams, True, 1, 100., 10., 0.2)
+            return tree, None

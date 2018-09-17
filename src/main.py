@@ -177,6 +177,8 @@ def run_train(args):
             dy.renew_cg()
             sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
             predicted, _ = parser.parse(sentence)
+            print('sentence: {}, predicted: {}'.format(zip(*sentence)[1],
+                                                predicted.convert().linearize()))
             dev_predicted.append(predicted.convert())
 
         dev_fscore = evaluate.evalb(args.evalb_dir, dev_treebank, dev_predicted)
