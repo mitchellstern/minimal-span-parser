@@ -52,13 +52,10 @@ class InternalTreebankNode(TreebankNode):
         tree = self
         children = []
         for child in tree.children:
-            try:
-                children.append(child.myconvert(dependancy, index=index))
-            except:
-                import pdb; pdb.set_trace()
+            children.append(child.myconvert(dependancy, index=index))
             index = children[-1].right
 
-        return InternalMyParseNode(tree.label, children)
+        return InternalMyParseNode(tree.label, children)(dependancy[children[0].left:children[-1].right])
 
 
 class LeafTreebankNode(TreebankNode):
@@ -184,6 +181,11 @@ class InternalMyParseNode(MyParseNode):
 
         self.parent = None
 
+    def __call__(self, dependency):
+        assert isinstance(dependency, list)
+        self.dependancy = dependency
+        return self
+
     def leaves(self):
         for child in self.children:
             yield from child.leaves()
@@ -275,20 +277,6 @@ class LeafMyParseNode(MyParseNode):
             side = CL if current.left > self.dependancy else CR
             label.append(side)
         self.label = tuple(label)
-
-    # def _reverse(self):
-    #     _label = []
-    #     sub_label = []
-    #     for t in self.label[::-1]:
-    #         if t.startswith(L) or t.startswith(R):
-    #             sub_label.append(t)
-    #         elif sub_label != []:
-    #             sub_label.append(t)
-    #             _label.extend(sub_label[::-1])
-    #             sub_label = []
-    #         else:
-    #             _label.append(t)
-    #     return _label
 
 class MissMyParseNode(MyParseNode):
     def __init__(self, label, index = 0):
