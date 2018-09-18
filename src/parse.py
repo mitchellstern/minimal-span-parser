@@ -5,7 +5,7 @@ import numpy as np
 
 import trees
 from beam.search import BeamSearch
-from astar.search import solve_tree_search
+from astar.search import astar_search
 
 START = "<START>"
 STOP = "<STOP>"
@@ -521,5 +521,5 @@ class MyParser(object):
             beams = [[helper(b, word, i) for b in beam]
                         for i, (beam, word) in enumerate(zip(beams, sentence))]
 
-            tree =  solve_tree_search(beams, True, 1, 100., 10., 0.2)
+            tree =  astar_search(beams, True, 1, 100., 10., 0.2)
             return tree, None

@@ -157,7 +157,7 @@ class Solver(AStar):
                 return current.trees[0].is_no_missing_leaves()
         return False
 
-def solve_tree_search(beams, no_val_gap, num_goals, time_out,
+def astar_search(beams, no_val_gap, num_goals, time_out,
                         time_th, cost_coeff_rate, verbose=1):
 
     n_words = len(beams)
