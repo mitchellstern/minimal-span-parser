@@ -22,7 +22,7 @@ def format_elapsed(start_time):
         elapsed_string = "{}d{}".format(days, elapsed_string)
     return elapsed_string
 
-def get_dependancies(fin, path_penn="../POST/code/pennconverter.jar"):
+def get_dependancies(fin, path_penn="src/pennconverter.jar"):
     """ Creates dependancy dictionary for each intput file"""
 
     command = 'java -jar {} < {} -splitSlash=false'.format(path_penn, fin)
@@ -56,7 +56,7 @@ def run_train(args):
     if args.parser_type != 'my':
         train_parse = [tree.convert() for tree in train_treebank]
     else:
-        dependancies = get_dependancies(args.train_path, '../POST/code/pennconverter.jar')
+        dependancies = get_dependancies(args.train_path)
         train_parse = [tree.myconvert(dep) for tree, dep in zip(train_treebank, dependancies)]
 
     print("Constructing vocabularies...")
@@ -221,11 +221,13 @@ def run_train(args):
                 sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
                 if args.parser_type == "top-down":
                     _, loss = parser.parse(sentence, tree, args.explore)
+                    batch_losses.append(loss)
                 elif args.parser_type == "my":
-                    _, loss = parser.parse(sentence, tree)
+                    _, losses = parser.parse(sentence, tree)
+                    batch_losses.extend(losses)
                 else:
                     _, loss = parser.parse(sentence, tree)
-                batch_losses.append(loss)
+                    batch_losses.append(loss)
                 total_processed += 1
                 current_processed += 1
 
