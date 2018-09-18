@@ -499,27 +499,32 @@ class MyParser(object):
                             self.label_vocab.index(STOP),
                             28)
 
-            beams = bs.beam_search(encode_outputs, self.label_embeddings, self.dec_lstm, ws)
+            hyps = bs.beam_search(encode_outputs, self.label_embeddings, self.dec_lstm, ws)
 
-            def helper(beam, leaf, index=0):
-                label = np.array(self.label_vocab.values)[beam[0]].tolist()[1:]
+            def helper(hyp, leaf, index=0):
+                label = np.array(self.label_vocab.values)[hyp[0]].tolist()[1:]
+                #illegal sequence for label
+                if (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
+                    return None
                 children = [trees.LeafMyParseNode(index, *leaf)]
                 while label:
-                    if not (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
-                        p_label = label[0]
-                        label = label[1:]
+                    p_label = label[0]
+                    label = label[1:]
                     while label and (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
                         index += 1
                         children.append(trees.MissMyParseNode(label[0], index))
                         label = label[1:]
-                    try:
-                        children = [trees.InternalMyParseNode(p_label, children)]
-                    except:
-                        import pdb; pdb.set_trace()
-                return (children[-1], beam[1])
+                    children = [trees.InternalMyParseNode(p_label, children)]
+                return (children[-1], hyp[1])
 
-            beams = [[helper(b, word, i) for b in beam]
-                        for i, (beam, word) in enumerate(zip(beams, sentence))]
+            beams = []
+            for i, (l_hyps, leaf) in enumerate(zip(hyps, sentence)):
+                beam = []
+                for hyp in l_hyps:
+                    pair = helper(hyp, leaf, i)
+                    if pair is not None:
+                        beam.append(pair)
+                beams.append(beam)
 
             tree =  astar_search(beams, True, 1, 100., 10., 0.2)
             return tree, None
