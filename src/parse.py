@@ -483,16 +483,16 @@ class MyParser(object):
                 alpha = dy.softmax(query * key)
                 context = _encode_outputs * alpha
                 x = dy.concatenate([decode_output, context])
-                #TODO x = helper(*ws[3], x)
-                probs =  affine(*ws[2], x, dy.softmax)
+                #TODO x = affine(*ws[3], x)
+                probs = affine(*ws[2], x, dy.softmax)
                 log_prob = []
                 for i, label in enumerate(decode_input[1:]):
                     id = self.label_vocab.index(label)
                     log_prob.append(-dy.log(dy.pick(dy.pick(probs, id), i)))
-                # losses.append(dy.esum(log_prob)
                 losses.extend(log_prob)
 
             return None, losses
+
         else:
             bs = BeamSearch(5,
                             self.label_vocab.index(START),
@@ -512,7 +512,10 @@ class MyParser(object):
                         index += 1
                         children.append(trees.MissMyParseNode(label[0], index))
                         label = label[1:]
-                    children = [trees.InternalMyParseNode(p_label, children)]
+                    try:
+                        children = [trees.InternalMyParseNode(p_label, children)]
+                    except:
+                        import pdb; pdb.set_trace()
                 return (children[-1], beam[1])
 
             beams = [[helper(b, word, i) for b in beam]
