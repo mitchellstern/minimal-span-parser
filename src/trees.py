@@ -260,7 +260,7 @@ class LeafMyParseNode(MyParseNode):
         label = [self.tag] #TODO remove this
         current = self
         next = self.parent
-        while next is not None and self.dependancy not in xrange(next.left+1, next.right+1):
+        while next is not None and self.dependancy not in range(next.left+1, next.right+1):
             #reached root but not dependant on root node
             if next.parent is None and self.dependancy != 0:
                 break
