@@ -273,6 +273,20 @@ class LeafMyParseNode(MyParseNode):
             label.append(side)
         self.label = tuple(label)
 
+    # def _reverse(self):
+    #     _label = []
+    #     sub_label = []
+    #     for t in self.label[::-1]:
+    #         if t.startswith(L) or t.startswith(R):
+    #             sub_label.append(t)
+    #         elif sub_label != []:
+    #             sub_label.append(t)
+    #             _label.extend(sub_label[::-1])
+    #             sub_label = []
+    #         else:
+    #             _label.append(t)
+    #     return _label
+
 class MissMyParseNode(MyParseNode):
     def __init__(self, label, index = 0):
         self.label = label
