@@ -489,9 +489,9 @@ class MyParser(object):
                 for i, label in enumerate(decode_input[1:]):
                     id = self.label_vocab.index(label)
                     log_prob.append(-dy.log(dy.pick(dy.pick(probs, id), i)))
-                losses.append(dy.average(log_prob))
+                losses.append(dy.esum(log_prob)
 
-            return None, dy.average(losses)
+            return None, dy.esum(losses)
         else:
             bs = BeamSearch(5,
                             self.label_vocab.index(START),
