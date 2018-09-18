@@ -413,14 +413,14 @@ class MyParser(object):
             embedding_dim + 2 * lstm_dim,
             self.model)
 
-        STATE_SIZE = embedding_dim + 2 * lstm_dim
-        ATTENTION_SIZE = STATE_SIZE + attention_dim
-        self.attention_w1 = self.model.add_parameters((attention_dim, STATE_SIZE))
-        self.attention_w2 = self.model.add_parameters((attention_dim, STATE_SIZE))
-        self.attention_v1 = self.model.add_parameters((attention_dim))
-        self.attention_v2 = self.model.add_parameters((attention_dim))
-        self.decoder_w = self.model.add_parameters((label_vocab.size, 2 * STATE_SIZE))
-        self.decoder_b = self.model.add_parameters((label_vocab.size))
+        self.weights = []
+        self.biases = []
+        state_size = embedding_dim + 2 * lstm_dim
+        for _ in range(2):
+            self.weights.append(self.model.add_parameters((attention_dim, state_size)))
+            self.biases.append(self.model.add_parameters((attention_dim)))
+        self.weights.append(self.model.add_parameters((label_vocab.size, 2 * state_size)))
+        self.biases.append(self.model.add_parameters((label_vocab.size)))
 
         self.dropout = dropout
 
@@ -433,6 +433,12 @@ class MyParser(object):
 
     def parse(self, sentence, gold=None):
         is_train = gold is not None
+
+        def affine(bias, weight, x, non_linearity=dy.rectify):
+            x = dy.affine_transform([bias, weight, x])
+            if non_linearity is None:
+                return x
+            return non_linearity(x)
 
         if is_train:
             self.enc_lstm.set_dropout(self.dropout)
@@ -450,52 +456,50 @@ class MyParser(object):
                     word = UNK
             word_embedding = self.word_embeddings[self.word_vocab.index(word)]
             embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
-
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
-        decode_init_states = []
-        for embedding, lstm_output in zip(embeddings, lstm_outputs):
-            decode_init_states.append(dy.concatenate([embedding, lstm_output]))
-        encode_outputs = decode_init_states[1:-1]
-        encode_outputs_col = dy.concatenate_cols(encode_outputs)
+        encode_outputs = [dy.concatenate([e, l]) for e, l in zip(embeddings, lstm_outputs)]
+        encode_outputs = encode_outputs[1:-1]
 
-        w1 = dy.parameter(self.attention_w1)
-        v1 = dy.parameter(self.attention_v1)
-        query = dy.transpose(dy.rectify((w1 * encode_outputs_col) + v1))
-
-        w = dy.parameter(self.decoder_w)
-        b = dy.parameter(self.decoder_b)
-        w2 = dy.parameter(self.attention_w2)
-        v2 = dy.parameter(self.attention_v2)
+        ws = [(dy.parameter(b), dy.parameter(w)) for b, w in zip(self.biases, self.weights)]
 
         if is_train:
             decode_inputs = [(START,) + leaf.label + (STOP,) for leaf in gold.leaves()]
-            loss = []
+            losses = []
+            _encode_outputs = dy.concatenate_cols(encode_outputs)
+            query = dy.transpose(affine(*ws[0], _encode_outputs))
             for encode_output, decode_input in zip(encode_outputs, decode_inputs):
-                encode_output_zeros = dy.zeros(encode_output.dim()[0])
-                intial_state = self.dec_lstm.initial_state(
-                                    [encode_output, encode_output_zeros])
+
                 label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
-                                    for label in decode_input[:-1]]
+                                        for label in decode_input[:-1]
+                                        ]
+
+                encode_output_zeros = dy.zeros(encode_output.dim()[0])
+                intial_state = self.dec_lstm.initial_state([encode_output,
+                                                            encode_output_zeros]
+                                                            )
                 decode_output = dy.concatenate_cols(intial_state.transduce(label_embedding))
-                key = dy.rectify((w2 * decode_output) + v2)
+                key = affine(*ws[1], decode_output)
                 alpha = dy.softmax(query * key)
-                context = encode_outputs_col * alpha
-                #TODO add res = dy.rectify(w3 * dy.concatenate([decode_output, context])) + b3)
-                label_probs = dy.softmax((w * dy.concatenate([decode_output, context])) + b)
-                n_labels = len(decode_input[1:])
-                gold_ids = [self.label_vocab.index(label) for label in decode_input[1:]]
-                e = dy.select_rows(label_probs, gold_ids)
-                loss.append(dy.average([-dy.log(e[i][i]) for i in range(n_labels)]))
-            return None, dy.average(loss)
+                context = _encode_outputs * alpha
+                x = dy.concatenate([decode_output, context])
+                #TODO x = helper(*ws[3], x)
+                probs =  affine(*ws[2], x, dy.softmax)
+                log_prob = []
+                for i, label in enumerate(decode_input[1:]):
+                    id = self.label_vocab.index(label)
+                    log_prob.append(-dy.log(dy.pick(dy.pick(probs, id), i)))
+                losses.append(dy.average(log_prob))
+
+            return None, dy.average(losses)
         else:
             bs = BeamSearch(5,
                             self.label_vocab.index(START),
                             self.label_vocab.index(STOP),
                             28)
 
-            beams = bs.beam_search(encode_outputs, self.label_embeddings,
-                                    self.dec_lstm, w1, v1, w2, v2, w, b)
+            beams = bs.beam_search(encode_outputs, self.label_embeddings, self.dec_lstm, ws)
+
             def helper(beam, leaf, index=0):
                 label = np.array(self.label_vocab.values)[beam[0]].tolist()[1:]
                 children = [trees.LeafMyParseNode(index, *leaf)]
