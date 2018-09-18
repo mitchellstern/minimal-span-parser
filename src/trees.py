@@ -248,7 +248,7 @@ class LeafMyParseNode(MyParseNode):
 
     def collapse(self, no_val_gap=False):
 
-        def helper(current, sibling, no_val_gap=no_val_gap):
+        def helper(current, sibling, no_val_gap = no_val_gap):
             side = L if current.left > sibling.left else R
             if no_val_gap:
                 return side+ANY
@@ -257,19 +257,22 @@ class LeafMyParseNode(MyParseNode):
             else:
                 return side+sibling.label
 
-        dependancy = self.dependancy
+        label = [self.tag] #TODO remove this
         current = self
         next = self.parent
-        label = [self.tag] #TODO remove this
-        while next is not None and dependancy not in (next.left+1, next.right):
-            if next.parent is None and dependancy != 0:
+        while next is not None and self.dependancy not in range(next.left+1, next.right+1):
+            #reached root but not dependant on root node
+            if next.parent is None and self.dependancy != 0:
                 break
+            #add parent node
             label.append(next.label)
+            #add all siblings as missing nodes
             label.extend([helper(current, sibling) for sibling in current.siblings()])
+            #move up one node
             current = next
             next = next.parent
-        if dependancy != 0:
-            side = CL if current.left > dependancy else CR
+        if self.dependancy != 0:
+            side = CL if current.left > self.dependancy else CR
             label.append(side)
         self.label = tuple(label)
 
