@@ -143,6 +143,7 @@ def run_train(args):
             args.attention_dim,
             args.dropout,
         )
+        # [parser] = dy.load('models/tmp', model)
     else:
         parser = parse.ChartParser(
             model,
@@ -177,8 +178,8 @@ def run_train(args):
             dy.renew_cg()
             sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
             predicted, _ = parser.parse(sentence)
-            import pdb; pdb.set_trace()
-            print('sentence: {}, predicted: {}'.format(zip(*sentence)[1],
+            tags, words = zip(*sentence)
+            print('sentence: {}\n predicted: {}'.format(' '.join(words),
                                                 predicted.convert().linearize()))
             dev_predicted.append(predicted.convert())
 
