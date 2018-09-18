@@ -179,7 +179,7 @@ def run_train(args):
             sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
             predicted, _ = parser.parse(sentence)
             tags, words = zip(*sentence)
-            print('sentence: {}\n predicted: {}'.format(' '.join(words),
+            print('sentence: {}\npredicted: {}'.format(' '.join(words),
                                                 predicted.convert().linearize()))
             dev_predicted.append(predicted.convert())
 
