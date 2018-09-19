@@ -78,7 +78,7 @@ class LeafTreebankNode(TreebankNode):
         return LeafParseNode(index, self.tag, self.word)
 
     def myconvert(self, dependancy, index=0):
-        return LeafMyParseNode(index, self.tag, self.word)(dependancy[index])
+        return LeafMyParseNode(index, self.tag, self.word)(dependancy[index] - 1)
 
 
 class ParseNode(object):
