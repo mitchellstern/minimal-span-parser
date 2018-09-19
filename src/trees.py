@@ -55,7 +55,7 @@ class InternalTreebankNode(TreebankNode):
             children.append(child.myconvert(dependancy, index=index))
             index = children[-1].right
 
-        return InternalMyParseNode(tree.label, children)(dependancy[children[0].left:children[-1].right])
+        return InternalMyParseNode(tree.label, children)
 
 
 class LeafTreebankNode(TreebankNode):
@@ -181,11 +181,6 @@ class InternalMyParseNode(MyParseNode):
 
         self.parent = None
 
-    def __call__(self, dependency):
-        assert isinstance(dependency, list)
-        self.dependancy = dependency
-        return self
-
     def leaves(self):
         for child in self.children:
             yield from child.leaves()
@@ -193,9 +188,41 @@ class InternalMyParseNode(MyParseNode):
     def convert(self):
         children = [child.convert() for child in self.children]
         tree = InternalTreebankNode(self.label, children)
-        # for sublabel in reversed(self.label[:-1]):
-        #     tree = InternalTreebankNode(sublabel, [tree])
         return tree
+
+    def collapse(self, keep_valence_value):
+
+        def helper(current, sibling, no_val_gap = keep_valence_value):
+            side = L if current.left > sibling.left else R
+            if no_val_gap:
+                return side+ANY
+            elif isinstance(sibling, LeafMyParseNode):
+                return side+sibling.tag
+            else:
+                return side+sibling.label
+
+        # Recursion
+        flag = CR
+        for child in self.children:
+            winner_child_leaf = child.collapse(keep_valence_value)
+
+            # Reached end of path can add flag
+            if winner_child_leaf.dependancy in range(self.left + 1, self.right + 1):
+                winner_child_leaf.label.append(flag)
+            else:
+                # only single child will move to parent
+                # and its value will be the one that is returned
+                # to the parent
+                winner_child_leaf.label.append(self.label)
+                winner_child_leaf.label.extend([helper(child, sibling) for sibling in child.siblings()])
+                ret_leaf_node = winner_child_leaf
+
+                # once we reached here, it means that
+                # this path includes the parent and thus flag
+                # direction should flip
+                flag = CL
+
+        return ret_leaf_node
 
     def siblings(self):
         return [child for child in self.parent.children if child != self]
@@ -248,35 +275,11 @@ class LeafMyParseNode(MyParseNode):
     def siblings(self):
         return [child for child in self.parent.children if child != self]
 
-    def collapse(self, no_val_gap=False):
+    def collapse(self, keep_valence_value):
 
-        def helper(current, sibling, no_val_gap = no_val_gap):
-            side = L if current.left > sibling.left else R
-            if no_val_gap:
-                return side+ANY
-            elif isinstance(sibling, LeafMyParseNode):
-                return side+sibling.tag
-            else:
-                return side+sibling.label
+        self.label = [self.tag]
+        return self
 
-        label = [self.tag] #TODO remove this
-        current = self
-        next = self.parent
-        while next is not None and self.dependancy not in range(next.left+1, next.right+1):
-            #reached root but not dependant on root node
-            if next.parent is None and self.dependancy != 0:
-                break
-            #add parent node
-            label.append(next.label)
-            #add all siblings as missing nodes
-            label.extend([helper(current, sibling) for sibling in current.siblings()])
-            #move up one node
-            current = next
-            next = next.parent
-        if self.dependancy != 0:
-            side = CL if current.left > self.dependancy else CR
-            label.append(side)
-        self.label = tuple(label)
 
 class MissMyParseNode(MyParseNode):
     def __init__(self, label, index = 0):
