@@ -211,14 +211,14 @@ class InternalMyParseNode(MyParseNode):
             winner_child_leaf = child.collapse(keep_valence_value)
 
             # Reached end of path can add flag
-            if winner_child_leaf.dependancy in range(self.left + 1, self.right + 1):
-                winner_child_leaf.label.append(flag)
+            if winner_child_leaf.dependancy in range(self.left, self.right) or (flag == CL):
+                winner_child_leaf.label + (flag,)
             else:
                 # only single child will move to parent
                 # and its value will be the one that is returned
                 # to the parent
-                winner_child_leaf.label.append(self.label)
-                winner_child_leaf.label.extend([helper(child, sibling) for sibling in child.siblings()])
+                winner_child_leaf.label + (self.label,)
+                winner_child_leaf.label+ tuple([helper(child, sibling) for sibling in child.siblings()])
                 ret_leaf_node = winner_child_leaf
 
                 # once we reached here, it means that
@@ -281,7 +281,7 @@ class LeafMyParseNode(MyParseNode):
 
     def collapse(self, keep_valence_value):
 
-        self.label = [self.tag]
+        self.label = tuple(self.tag)
         return self
 
 
