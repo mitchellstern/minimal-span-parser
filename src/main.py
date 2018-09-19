@@ -57,7 +57,7 @@ def run_train(args):
         train_parse = [tree.convert() for tree in train_treebank]
     else:
         dependancies = get_dependancies(args.train_path)
-        train_parse = [tree.myconvert(dep) for tree, dep in zip(train_treebank, dependancies)]
+        train_parse = [tree.myconvert(dep)(args.keep_valence_value) for tree, dep in zip(train_treebank, dependancies)]
 
     print("Constructing vocabularies...")
 
@@ -87,7 +87,6 @@ def run_train(args):
             elif isinstance(node, trees.InternalMyParseNode):
                 nodes.extend(reversed(node.children))
             elif isinstance(node, trees.LeafMyParseNode):
-                node.collapse(True)
                 for l in node.label:
                     label_vocab.index(l)
                 tag_vocab.index(node.tag)
@@ -327,6 +326,7 @@ def main():
     subparser.add_argument("--epochs", type=int)
     subparser.add_argument("--checks-per-epoch", type=int, default=4)
     subparser.add_argument("--print-vocabs", action="store_true")
+    subparser.add_argument("--keep-valence-value", action="store_true")
 
     subparser = subparsers.add_parser("test")
     subparser.set_defaults(callback=run_test)

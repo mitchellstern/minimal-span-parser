@@ -181,6 +181,10 @@ class InternalMyParseNode(MyParseNode):
 
         self.parent = None
 
+    def __call__(self, keep_valence_value):
+        self.collapse(keep_valence_value)
+        return self
+
     def leaves(self):
         for child in self.children:
             yield from child.leaves()
@@ -192,9 +196,9 @@ class InternalMyParseNode(MyParseNode):
 
     def collapse(self, keep_valence_value):
 
-        def helper(current, sibling, no_val_gap = keep_valence_value):
+        def helper(current, sibling):
             side = L if current.left > sibling.left else R
-            if no_val_gap:
+            if keep_valence_value:
                 return side+ANY
             elif isinstance(sibling, LeafMyParseNode):
                 return side+sibling.tag
