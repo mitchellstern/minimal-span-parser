@@ -198,7 +198,7 @@ class InternalMyParseNode(MyParseNode):
 
         def helper(current, sibling):
             side = L if current.left > sibling.left else R
-            if keep_valence_value:
+            if not keep_valence_value:
                 return side+ANY
             elif isinstance(sibling, LeafMyParseNode):
                 return side+sibling.tag
