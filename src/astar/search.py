@@ -24,7 +24,6 @@ class AstarNode(object):
     def __hash__(self):
         return id(self)
 
-    def is_valid(self, miss_tag_any):
     def format_print(self, label):
         pair = '({},{})'.format(self.left, self.right)
 
@@ -42,49 +41,41 @@ class AstarNode(object):
 
         return node_string
 
+    def is_valid(self, keep_valence_value):
         assert isinstance(self.trees, list)
-        assert len(self.trees) in [1,2]
+        assert len(self.trees) == 2
 
-        def helper(c_trees, comb_side, miss_side, miss_tag_any):
+        def helper(_trees, comb_side, miss_side):
 
-            assert isinstance(c_trees[0], trees.InternalMyParseNode)
-            assert (c_trees[0].label in [trees.CR, trees.CL])
-            assert len(c_trees[0].children) == 1
-
-            for leaf in list(c_trees[1].leaves())[::-1]:
-                # check that destination tree has missing leaves and
-                # they combine to the proper side
-                if isinstance(leaf, trees.MissMyParseNode) and leaf.label.startswith(miss_side):
-                    if miss_tag_any:
-                        return leaf
-                    label = leaf.label.split(miss_side)[-1]
-                    if isinstance(c_trees[0].children[-1], trees.InternalMyParseNode):
-                        src_label = c_trees[0].children[-1].label
-                    else:
-                        src_label = c_trees[0].children[-1].tag
-                    if src_label == label:
-                        return leaf
-            return None
-
-        if len(self.trees) == 1:
-            return True
+            assert isinstance(_trees[0], trees.InternalMyParseNode)
+            assert (_trees[0].label in [trees.CR, trees.CL])
+            assert len(_trees[0].children) == 1
+            #TODO fix combination order --> incorrect order
+            leaves = []
+            label = _trees[0].children[-1].bracket_label()
+            for leaf in _trees[1].missing_leaves():
+                if leaf.label.startswith(miss_side):
+                    missing_label = leaf.label.split(miss_side)[-1]
+                    if not keep_valence_value:
+                        leaves.append(leaf)
+                    elif missing_label == label:
+                        leaves.append(leaf)
+            return leaves
 
         if all(isinstance(tree, trees.InternalMyParseNode) for tree in self.trees):
-            #try combining left tree into right tree
-            if self.trees[0].label == trees.CR and self.trees[0].is_no_missing_leaves():
-                miss_node = helper(self.trees, trees.CR, trees.L, miss_tag_any)
-                if miss_node is not None:
-                    self.trees = [self.trees[1].combine_tree(self.trees[0], miss_node)]
+            #Trying to combine Left Tree --> Right Tree
+            if self.trees[0].label == trees.CR and len(list(self.trees[0].missing_leaves()))==0:
+                leaves = helper(self.trees, trees.CR, trees.L)
+                if leaves != []:
+                    self.trees = [self.trees[1].combine(self.trees[0].children[0], leaves[-1])]
                     return True
 
-            #try combining right tree into left tree
-            if isinstance(self.trees[1], trees.InternalMyParseNode):
-                if self.trees[1].label == trees.CL and self.trees[1].is_no_missing_leaves():
-                    miss_node = helper(self.trees[::-1], trees.CL, trees.R, miss_tag_any)
-                    if miss_node is not None:
-                        self.trees = [self.trees[0].combine_tree(self.trees[1], miss_node)]
-                        return True
-
+            #Trying to combine Right Tree --> Left Tree
+            if self.trees[1].label == trees.CL and len(list(self.trees[1].missing_leaves()))==0:
+                leaves = helper(self.trees[::-1], trees.CL, trees.R)
+                if leaves != []:
+                    self.trees = [self.trees[0].combine(self.trees[1].children[0], leaves[0])]
+                    return True
         return False
 
 
@@ -116,9 +107,9 @@ class ClosedList(object):
 
 class Solver(AStar):
 
-    def __init__(self, ts_mat, no_val_gap):
+    def __init__(self, ts_mat, keep_valence_value):
         self.ts_mat = ts_mat
-        self.miss_tag_any = no_val_gap
+        self.keep_valence_value = keep_valence_value
         self.cl = ClosedList()
         self.seen = []
 
