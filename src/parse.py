@@ -381,6 +381,7 @@ class MyParser(object):
             label_hidden_dim,
             attention_dim,
             dropout,
+            keep_valence_value,
     ):
         self.spec = locals()
         self.spec.pop("self")
@@ -389,6 +390,7 @@ class MyParser(object):
         self.tag_vocab = tag_vocab
         self.word_vocab = word_vocab
         self.label_vocab = label_vocab
+        self.keep_valence_value = keep_valence_value
         self.lstm_dim = lstm_dim
 
         self.tag_embeddings = self.model.add_lookup_parameters(
