@@ -143,7 +143,6 @@ def run_train(args):
             args.dropout,
             args.keep_valence_value
         )
-        # [parser] = dy.load('models/tmp', model)
     else:
         parser = parse.ChartParser(
             model,
