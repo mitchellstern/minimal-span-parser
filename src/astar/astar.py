@@ -36,15 +36,6 @@ class AStar:
             return v
 
     @abstractmethod
-    def is_max_len(self, current, max_len, max_node):
-        """Keeps track of the max lenght node seen so far"""
-        raise NotImplementedError
-
-    @abstractmethod
-    def print_fn(self, current):
-        """Prints currents node information"""
-        raise NotImplementedError
-
     @abstractmethod
     def heuristic_cost(self, current, goal):
         """Computes the estimated (rough) distance between a node and the goal,
@@ -71,19 +62,17 @@ class AStar:
     def move_to_closed(self, current):
         raise NotImplementedError
 
-    def reconstruct_path(self, last, reverse_path=False):
-        def _gen():
-            current = last
-            while current:
-                yield current.data
-                current = current.came_from
-        if reverse_path:
-            return _gen()
-        else:
-            return reversed(list(_gen()))
+    # def reconstruct_path(self, last, reverse_path=False):
+    #     def _gen():
+    #         current = last
+    #         while current:
+    #             yield current.data
+    #             current = current.came_from
+    #     if reverse_path:
+    #         return _gen()
+    #     else:
+    #         return reversed(list(_gen()))
 
-    def astar(self, start, goal, num_goals, time_out, time_th,
-                cost_coeff_rate, verbose=1, reverse_path = False):
         current_time = start_time = time.clock()
         cost_coeff = 1.
         searchNodes = AStar.SearchNodeDict()
@@ -107,9 +96,8 @@ class AStar:
                 current_time = time.clock()
             if verbose > 0:
                 self.print_fn(current, 'current')
-                # max_len, max_node = self.is_max_len(current.data, max_len, max_node)
             if self.is_goal_reached(current.data, goal):
-                goals.append(self.reconstruct_path(current, reverse_path))
+                # goals.append(self.reconstruct_path(current, reverse_path))
             current.out_openset = True
             current.closed = True
             self.move_to_closed(current.data)
