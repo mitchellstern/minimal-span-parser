@@ -433,7 +433,7 @@ class MyParser(object):
     def from_spec(cls, spec, model):
         return cls(model, **spec)
 
-    def parse(self, sentence, gold=None):
+    def parse(self, sentence, gold=None, beam_parms=None, astar_parms=None):
         is_train = gold is not None
 
         def affine(bias, weight, x, non_linearity=dy.rectify):
@@ -466,7 +466,7 @@ class MyParser(object):
         ws = [(dy.parameter(b), dy.parameter(w)) for b, w in zip(self.biases, self.weights)]
 
         if is_train:
-            decode_inputs = [(START,) + leaf.label + (STOP,) for leaf in gold.leaves()]
+            decode_inputs = [(START,) + tuple(leaf.labels) + (STOP,) for leaf in gold.leaves()]
             losses = []
             _encode_outputs = dy.concatenate_cols(encode_outputs)
             query = dy.transpose(affine(*ws[0], _encode_outputs))
@@ -496,37 +496,21 @@ class MyParser(object):
             return None, losses
 
         else:
-            bs = BeamSearch(5,
-                            self.label_vocab.index(START),
+            bs = BeamSearch(self.label_vocab.index(START),
                             self.label_vocab.index(STOP),
-                            28)
+                            *beam_parms)
 
             hyps = bs.beam_search(encode_outputs, self.label_embeddings, self.dec_lstm, ws)
 
-            def helper(hyp, leaf, index=0):
-                label = np.array(self.label_vocab.values)[hyp[0]].tolist()[1:]
-                #illegal sequence for label
-                if (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
-                    return None
-                children = [trees.LeafMyParseNode(index, *leaf)]
-                while label:
-                    p_label = label[0]
-                    label = label[1:]
-                    while label and (label[0].startswith(trees.R) or label[0].startswith(trees.L)):
-                        index += 1
-                        children.append(trees.MissMyParseNode(label[0], index))
-                        label = label[1:]
-                    children = [trees.InternalMyParseNode(p_label, children)]
-                return (children[-1], hyp[1])
-
             beams = []
-            for i, (l_hyps, leaf) in enumerate(zip(hyps, sentence)):
+            for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
                 beam = []
-                for hyp in l_hyps:
-                    pair = helper(hyp, leaf, i)
-                    if pair is not None:
-                        beam.append(pair)
+                for hyp in leaf_hyps:
+                    labels = np.array(self.label_vocab.values)[hyp[0]].tolist()
+                    partial_tree = trees.LeafMyParseNode(i, *leaf).deserialize(labels)
+                    if partial_tree is not None:
+                        beam.append((partial_tree, hyp[1]))
                 beams.append(beam)
 
-            tree =  astar_search(beams, True, 1, 100., 10., 0.2)
+            tree =  astar_search(beams, self.keep_valence_value, astar_parms)
             return tree, None

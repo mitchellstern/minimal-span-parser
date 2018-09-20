@@ -182,19 +182,23 @@ class InternalMyParseNode(MyParseNode):
         self.parent = None
 
     def __call__(self, keep_valence_value):
-        self.collapse(keep_valence_value)
+        self.serialize(keep_valence_value)
         return self
 
     def leaves(self):
         for child in self.children:
             yield from child.leaves()
 
+    def missing_leaves(self):
+        for child in self.children:
+            yield from child.missing_leaves()
+
     def convert(self):
         children = [child.convert() for child in self.children]
         tree = InternalTreebankNode(self.label, children)
         return tree
 
-    def collapse(self, keep_valence_value):
+    def serialize(self, keep_valence_value):
 
         def helper(current, sibling):
             side = L if current.left > sibling.left else R
@@ -208,17 +212,17 @@ class InternalMyParseNode(MyParseNode):
         # Recursion
         flag = CR
         for child in self.children:
-            winner_child_leaf = child.collapse(keep_valence_value)
+            winner_child_leaf = child.serialize(keep_valence_value)
 
             # Reached end of path can add flag
             if winner_child_leaf.dependancy in range(self.left, self.right) or (flag == CL):
-                winner_child_leaf.label + (flag,)
+                winner_child_leaf.labels.append(flag)
             else:
                 # only single child will move to parent
                 # and its value will be the one that is returned
                 # to the parent
-                winner_child_leaf.label + (self.label,)
-                winner_child_leaf.label+ tuple([helper(child, sibling) for sibling in child.siblings()])
+                winner_child_leaf.labels.append(self.label)
+                winner_child_leaf.labels.extend([helper(child, sibling) for sibling in child.siblings()])
                 ret_leaf_node = winner_child_leaf
 
                 # once we reached here, it means that
@@ -231,26 +235,21 @@ class InternalMyParseNode(MyParseNode):
     def siblings(self):
         return [child for child in self.parent.children if child != self]
 
-    def is_no_missing_leaves(self):
-        for leaf in self.leaves():
-            if isinstance(leaf, MissMyParseNode):
-                return False
-        return True
+    def bracket_label(self):
+        return self.label
 
-    def combine_tree(self, node_to_merge, node_to_remove):
-        assert isinstance(node_to_merge, InternalMyParseNode)
-        assert (node_to_merge.label in [CL, CR])
-        assert len(node_to_merge.children) == 1
-        assert isinstance(node_to_remove, MissMyParseNode)
-        assert (node_to_remove in self.leaves())
+    def combine(self, node_to_merge, node_to_remove):
+        # assert isinstance(node_to_merge, trees.InternalMyParseNode)
+        # assert (node_to_merge.label in [trees.CL, trees.CR])
+        # assert len(node_to_merge.children) == 1
+        # assert isinstance(node_to_remove, trees.MissMyParseNode)
+        # assert (node_to_remove in self.leaves())
 
-        node_to_merge = node_to_merge.children[0]
-        node_to_merge.parent = node_to_remove.parent
-        children = node_to_remove.siblings() + [node_to_merge]
-        children = sorted(children, key = lambda child: child.left)
-        node_to_remove.parent.children = children
-
-        return self
+        tree = self
+        children = []
+        for child in tree.children:
+            children.append(child.combine(node_to_merge, node_to_remove))
+        return InternalMyParseNode(tree.label, children)
 
 class LeafMyParseNode(MyParseNode):
     def __init__(self, index, tag, word):
@@ -270,20 +269,48 @@ class LeafMyParseNode(MyParseNode):
         self.dependancy = dependency
         return self
 
+    def bracket_label(self):
+        return self.tag
+
     def leaves(self):
         yield self
+
+    def missing_leaves(self):
+        yield from ()
 
     def convert(self):
         return LeafTreebankNode(self.tag, self.word)
 
+    def combine(self, node_to_merge, node_to_remove):
+        return LeafMyParseNode(self.left, self.tag, self.word)
+
     def siblings(self):
         return [child for child in self.parent.children if child != self]
 
-    def collapse(self, keep_valence_value):
-
-        self.label = tuple(self.tag)
+    def serialize(self, keep_valence_value):
+        # self.label = tuple(self.tag)
+        self.labels = []
         return self
 
+    def deserialize(self, labels):
+        # invalid labels: labels should start with token not missing
+        if (labels[0].startswith(R) or labels[0].startswith(L)):
+            return None
+        index = self.left
+        children = [self]
+        while labels:
+            p_label = labels[0]
+            labels = labels[1:]
+            while labels and (labels[0].startswith(R) or labels[0].startswith(L)):
+                if labels[0].startswith(R):
+                    index = children[-1].right
+                    children += [MissMyParseNode(labels[0], index)]
+                else:
+                    index = children[0].left - 1
+                    children = [MissMyParseNode(labels[0], index)] + children
+                labels = labels[1:]
+            children = [InternalMyParseNode(p_label, children)]
+        return children[-1]
 
 class MissMyParseNode(MyParseNode):
     def __init__(self, label, index = 0):
@@ -294,11 +321,24 @@ class MissMyParseNode(MyParseNode):
     def leaves(self):
         yield self
 
+    def missing_leaves(self):
+        yield self
+
     def siblings(self):
         return [child for child in self.parent.children if child != self]
 
     def convert(self):
         return LeafTreebankNode(self.label, self.label)
+
+    def bracket_label(self):
+        return self.label
+
+    def combine(self, node_to_merge, node_to_remove):
+
+        tree = self
+        if tree == node_to_remove:
+            return node_to_merge.combine(node_to_merge, node_to_remove)
+        return MissMyParseNode(tree.label, tree.left)
 
 def load_trees(path, strip_top=True):
     with open(path) as infile:

@@ -87,7 +87,7 @@ def run_train(args):
             elif isinstance(node, trees.InternalMyParseNode):
                 nodes.extend(reversed(node.children))
             elif isinstance(node, trees.LeafMyParseNode):
-                for l in node.label:
+                for l in node.labels:
                     label_vocab.index(l)
                 tag_vocab.index(node.tag)
                 word_vocab.index(node.word)
@@ -141,6 +141,7 @@ def run_train(args):
             args.label_hidden_dim,
             args.attention_dim,
             args.dropout,
+            args.keep_valence_value
         )
         # [parser] = dy.load('models/tmp', model)
     else:
@@ -327,6 +328,8 @@ def main():
     subparser.add_argument("--checks-per-epoch", type=int, default=4)
     subparser.add_argument("--print-vocabs", action="store_true")
     subparser.add_argument("--keep-valence-value", action="store_true")
+    subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2])
+    subparser.add_argument("--beam-parms", nargs=2, default=[5, 28])
 
     subparser = subparsers.add_parser("test")
     subparser.set_defaults(callback=run_test)
