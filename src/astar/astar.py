@@ -85,7 +85,7 @@ class AStar:
         goals = []
         for strt in  start:
             if self.is_goal_reached(strt, goal):
-                goals.append(strt.data)
+                goals.append(strt)
             cost = self.fscore(strt, goal, cost_coeff)
             startNode = searchNodes[strt] = AStar.SearchNode(strt, fscore=cost)
             heappush(openSet, startNode)
