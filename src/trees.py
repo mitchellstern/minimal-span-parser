@@ -168,9 +168,11 @@ class InternalMyParseNode(MyParseNode):
         assert isinstance(children, collections.abc.Sequence)
         assert all(isinstance(child, MyParseNode) for child in children)
         assert children
-        assert all(
-            left.right == right.left
-            for left, right in zip(children, children[1:]))
+        # assert all(
+        #     left.right == right.left
+        #     for left, right in zip(children, children[1:])
+        #     if not (isinstance(left, MissMyParseNode)
+        #             and isinstance(right, MissMyParseNode)))
         self.children = tuple(children)
 
         for child in self.children:
