@@ -1,3 +1,4 @@
+from itertools import chain
 from .astar import AStar
 import trees
 import numpy as np
@@ -127,8 +128,8 @@ class Solver(AStar):
         heuristic_cost = self.heuristic_cost(node, goal, cost_coeff)
         return real_cost + heuristic_cost
 
-    def move_to_closed(self, current):
-        self.cl.put(current)
+    def move_to_closed(self, node):
+        self.cl.put(node)
 
     def neighbors(self, node):
         neighbors = []
@@ -150,10 +151,10 @@ class Solver(AStar):
                 neighbors.append(nb_node)
         return neighbors
 
-    def is_goal_reached(self, current, goal):
-        if (current.left, current.right) == (goal.left, goal.right):
-            if len(current.trees) == 1:
-                return current.trees[0].is_no_missing_leaves()
+    def is_goal_reached(self, node, goal):
+        if (node.left, node.right) == (goal.left, goal.right):
+            if len(node.trees) == 1:
+                return len(list(node.trees[0].missing_leaves()))==0
         return False
 
 def astar_search(beams, keep_valence_value, astar_parms, verbose=1):

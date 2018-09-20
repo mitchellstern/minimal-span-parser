@@ -76,6 +76,8 @@ class AStar:
     #     else:
     #         return reversed(list(_gen()))
 
+    def astar(self, start, goal, num_goals, time_out, time_th, cost_coeff_rate, verbose=1):
+                # cost_coeff_rate, verbose=1, reverse_path = False):
         current_time = start_time = time.clock()
         cost_coeff = 1.
         searchNodes = AStar.SearchNodeDict()
@@ -94,8 +96,8 @@ class AStar:
                 for t in openSet:
                     t.fscore = self.fscore(t.data, goal, cost_coeff)
                 current_time = time.clock()
-            if verbose > 0:
-                self.print_fn(current, 'current')
+            if verbose > 0: print(current.format_print('current'))
+
             if self.is_goal_reached(current.data, goal):
                 # goals.append(self.reconstruct_path(current, reverse_path))
                 goals.append(current.data)
@@ -111,7 +113,7 @@ class AStar:
                 if neighbor.out_openset:
                     neighbor.out_openset = False
                     heappush(openSet, neighbor)
-                if verbose > 1 :
-                    self.print_fn(neighbor, 'neighbor')
-        # return goals, max_node
+
+                if verbose > 1: print(neighbor.print_fn('neighbor'))
+
         return goals
