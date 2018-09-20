@@ -2,9 +2,9 @@ from .astar import AStar
 import trees
 import numpy as np
 
-class NodeT(object):
+class AstarNode(object):
 
-    def __init__(self, left, right, rank, trees = []):
+    def __init__(self, left, right, rank, trees=[]):
 
         assert isinstance(left, int)
         self.left = left
@@ -142,20 +142,19 @@ class Solver(AStar):
     def neighbors(self, node):
         neighbors = []
         for nb in self.cl.getl(node.right):
-            nb_node = NodeT(node.left, nb.right, node.rank + nb.rank, node.trees + nb.trees)
-            if nb_node not in self.seen and nb_node.is_valid(self.miss_tag_any):
+            nb_node = AstarNode(node.left, nb.right, node.rank + nb.rank, node.trees + nb.trees)
+            if nb_node not in self.seen and nb_node.is_valid(self.keep_valence_value):
                 self.seen.append(nb_node)
                 neighbors.append(nb_node)
         for nb in self.cl.getr(node.left):
-            nb_node = NodeT(nb.left, node.right, nb.rank + node.rank, nb.trees + node.trees)
-            if nb_node.is_valid(self.miss_tag_any) and nb_node not in self.seen:
+            nb_node = AstarNode(nb.left, node.right, nb.rank + node.rank, nb.trees + node.trees)
+            if nb_node not in self.seen and nb_node.is_valid(self.keep_valence_value):
                 self.seen.append(nb_node)
                 neighbors.append(nb_node)
         if len(node.rank) == 1 and node.rank[0] + 1 < len(self.ts_mat[node.left]):
             rank = node.rank[0] + 1
-            trees = [self.ts_mat[node.left][rank][0]]
-            nb_node = NodeT(node.left, node.right, [rank], trees)
-            if nb_node.is_valid(self.miss_tag_any) and nb_node not in self.seen:
+            nb_node = AstarNode(node.left, node.right, [rank], [self.ts_mat[node.left][rank][0]])
+            if nb_node not in self.seen:
                 self.seen.append(nb_node)
                 neighbors.append(nb_node)
         return neighbors
@@ -169,8 +168,8 @@ class Solver(AStar):
 def astar_search(beams, keep_valence_value, astar_parms, verbose=1):
 
     n_words = len(beams)
-    start = [NodeT(idx, idx+1, [0], [beams[idx][0][0]]) for idx in range(n_words)]
-    goal = NodeT(0, n_words, [])
+    start = [AstarNode(idx, idx+1, [0], [beams[idx][0][0]]) for idx in range(n_words)]
+    goal = AstarNode(0, n_words, [])
     # let's solve it
     nodes = Solver(beams, keep_valence_value).astar(start, goal, *astar_parms, verbose)
 
