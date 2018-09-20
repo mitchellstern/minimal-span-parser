@@ -36,15 +36,18 @@ class AStar:
             return v
 
     @abstractmethod
-    @abstractmethod
-    def heuristic_cost(self, current, goal):
+    def heuristic_cost(self, node, goal):
         """Computes the estimated (rough) distance between a node and the goal,
         this method must be implemented in a subclass. The second parameter is
         always the goal."""
         raise NotImplementedError
 
     @abstractmethod
-    def real_cost(self, current):
+    def real_cost(self, node):
+        raise NotImplementedError
+
+    @abstractmethod
+    def fscore(self, node, goal):
         raise NotImplementedError
 
     @abstractmethod
@@ -78,12 +81,10 @@ class AStar:
         searchNodes = AStar.SearchNodeDict()
         openSet = []
         goals = []
-        # max_len = 0
-        # max_node = None
         for strt in  start:
             if self.is_goal_reached(strt, goal):
-                goals.append(strt)
-            cost = self.real_cost(strt) + self.heuristic_cost(strt, goal, cost_coeff)
+                goals.append(strt.data)
+            cost = self.fscore(strt, goal, cost_coeff)
             startNode = searchNodes[strt] = AStar.SearchNode(strt, fscore=cost)
             heappush(openSet, startNode)
         while (time.clock() - start_time < time_out) and openSet and len(goals) < num_goals:
@@ -91,21 +92,20 @@ class AStar:
             if (time.clock() - current_time >= time_th):
                 cost_coeff *= cost_coeff_rate
                 for t in openSet:
-                    t.fscore = self.real_cost(t.data) \
-                            + self.heuristic_cost(t.data, goal, cost_coeff)
+                    t.fscore = self.fscore(t.data, goal, cost_coeff)
                 current_time = time.clock()
             if verbose > 0:
                 self.print_fn(current, 'current')
             if self.is_goal_reached(current.data, goal):
                 # goals.append(self.reconstruct_path(current, reverse_path))
+                goals.append(current.data)
             current.out_openset = True
             current.closed = True
             self.move_to_closed(current.data)
             for neighbor in [searchNodes[n] for n in self.neighbors(current.data)]:
                 if neighbor.closed:
                     continue
-                neighbor.fscore = self.real_cost(neighbor.data) \
-                                    + self.heuristic_cost(neighbor.data, goal, cost_coeff)
+                neighbor.fscore = self.fscore(neighbor.data, goal, cost_coeff)
                 neighbor.came_from = current
 
                 if neighbor.out_openset:

@@ -122,28 +122,19 @@ class Solver(AStar):
         self.cl = ClosedList()
         self.seen = []
 
-    def is_max_len(self, current, max_len, max_node):
-        if len(current.rank) > max_len:
-            return len(current.rank), current
-        else:
-            return max_len, max_node
+    def heuristic_cost(self, node, goal, cost_coeff):
+        left = list(range(node.left))
+        right = list(range(node.right, goal.right))
+        return cost_coeff * sum([self.ts_mat[i][0][1] for i in chain(left, right)])
 
-    def print_fn(self, current, name):
-        print ('%s: range %s, rank %s, score %f'
-                %(name, (current.data.left, current.data.right), current.data.rank, current.fscore))
+    def real_cost(self, node):
+        position = zip(range(node.left, node.right), node.rank)
+        return sum([self.ts_mat[i][rank][1] for i, rank in position])
 
-    def heuristic_cost(self, current, goal, cost_coeff):
-        r_rng = [0] if current.left == 0 else list(range(current.left))
-        l_rng = list(range(current.right, goal.right))
-        idx_range = r_rng + l_rng
-        return cost_coeff * sum([self.ts_mat[rng][0][1] for rng in idx_range])
-
-    def real_cost(self, current):
-        # if current.is_valid(self.ts_mat[current.left][current.rank[0]]['tree'], self.miss_tag_any):
-        idx_range = list(range(current.left, current.right))
-        pos = zip(idx_range, current.rank)
-        return sum([self.ts_mat[rng][rnk][1] for rng, rnk in pos])
-        # return .0
+    def fscore(self, node, goal, cost_coeff):
+        real_cost = self.real_cost(node)
+        heuristic_cost = self.heuristic_cost(node, goal, cost_coeff)
+        return real_cost + heuristic_cost
 
     def move_to_closed(self, current):
         self.cl.put(current)
@@ -175,17 +166,14 @@ class Solver(AStar):
                 return current.trees[0].is_no_missing_leaves()
         return False
 
-def astar_search(beams, no_val_gap, num_goals, time_out,
-                        time_th, cost_coeff_rate, verbose=1):
+def astar_search(beams, keep_valence_value, astar_parms, verbose=1):
 
     n_words = len(beams)
     start = [NodeT(idx, idx+1, [0], [beams[idx][0][0]]) for idx in range(n_words)]
     goal = NodeT(0, n_words, [])
     # let's solve it
-    path = Solver(beams, no_val_gap).astar(start, goal, num_goals, time_out,
-                                            time_th, cost_coeff_rate)
+    nodes = Solver(beams, keep_valence_value).astar(start, goal, *astar_parms, verbose)
 
-    if path == []:
-        return trees.LeafMyParseNode(0, '', '')
-    path = list(path)[-1]
-    return path.trees[0]
+    if nodes == []:
+         return trees.LeafMyParseNode(0, '', '')
+    return nodes[0].trees[0]
