@@ -1,5 +1,6 @@
 from .astar import AStar
 import trees
+import numpy as np
 
 class NodeT(object):
 
@@ -24,6 +25,23 @@ class NodeT(object):
         return id(self)
 
     def is_valid(self, miss_tag_any):
+    def format_print(self, label):
+        pair = '({},{})'.format(self.left, self.right)
+
+        ranks_split = np.split(np.array(self.rank), np.where(np.diff(self.rank))[0] + 1)
+        ranks = ', '.join(['{{{}}}{}'.format(r[0], len(r)) for r in ranks_split])
+
+        MY_LENGTH_CONSTRAINT = len(ranks_split) * 7
+        node_string = '[{}:] node: {: <8} rank: [{: <{mlc}}]'.format(label, pair, ranks,
+                                                        mlc = MY_LENGTH_CONSTRAINT)
+
+        for i, tree in enumerate(self.trees):
+            pair = '({},{})'.format(tree.left, tree.right)
+            # ptb = tree.convert().linearize()
+            node_string = '{} tree[{}]: {: <8}'.format(node_string, i, pair)
+
+        return node_string
+
         assert isinstance(self.trees, list)
         assert len(self.trees) in [1,2]
 
