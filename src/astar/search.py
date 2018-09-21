@@ -108,8 +108,8 @@ class ClosedList(object):
 
 class Solver(AStar):
 
-    def __init__(self, ts_mat, keep_valence_value):
-        self.ts_mat = ts_mat
+    def __init__(self, grid, keep_valence_value):
+        self.grid = grid
         self.keep_valence_value = keep_valence_value
         self.cl = ClosedList()
         self.seen = []
@@ -117,11 +117,11 @@ class Solver(AStar):
     def heuristic_cost(self, node, goal, cost_coeff):
         left = list(range(node.left))
         right = list(range(node.right, goal.right))
-        return cost_coeff * sum([self.ts_mat[i][0][1] for i in chain(left, right)])
+        return cost_coeff * sum([self.grid[i][0][1] for i in chain(left, right)])
 
     def real_cost(self, node):
         position = zip(range(node.left, node.right), node.rank)
-        return sum([self.ts_mat[i][rank][1] for i, rank in position])
+        return sum([self.grid[i][rank][1] for i, rank in position])
 
     def fscore(self, node, goal, cost_coeff):
         real_cost = self.real_cost(node)
@@ -143,9 +143,9 @@ class Solver(AStar):
             if nb_node not in self.seen and nb_node.is_valid(self.keep_valence_value):
                 self.seen.append(nb_node)
                 neighbors.append(nb_node)
-        if len(node.rank) == 1 and node.rank[0] + 1 < len(self.ts_mat[node.left]):
+        if len(node.rank) == 1 and node.rank[0] + 1 < len(self.grid[node.left]):
             rank = node.rank[0] + 1
-            nb_node = AstarNode(node.left, node.right, [rank], [self.ts_mat[node.left][rank][0]])
+            nb_node = AstarNode(node.left, node.right, [rank], [self.grid[node.left][rank][0]])
             if nb_node not in self.seen:
                 self.seen.append(nb_node)
                 neighbors.append(nb_node)
@@ -157,13 +157,13 @@ class Solver(AStar):
                 return len(list(node.trees[0].missing_leaves()))==0
         return False
 
-def astar_search(beams, keep_valence_value, astar_parms, verbose=1):
+def astar_search(grid, keep_valence_value, astar_parms, verbose=1):
 
-    n_words = len(beams)
-    start = [AstarNode(idx, idx+1, [0], [beams[idx][0][0]]) for idx in range(n_words)]
+    n_words = len(grid)
+    start = [AstarNode(idx, idx+1, [0], [grid[idx][0][0]]) for idx in range(n_words)]
     goal = AstarNode(0, n_words, [])
     # let's solve it
-    nodes = Solver(beams, keep_valence_value).astar(start, goal, *astar_parms, verbose)
+    nodes = Solver(grid, keep_valence_value).astar(start, goal, *astar_parms, verbose)
 
     if nodes == []:
          return trees.LeafMyParseNode(0, '', '')
