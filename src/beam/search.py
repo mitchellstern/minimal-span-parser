@@ -53,7 +53,6 @@ class Hypothesis(object):
                         self.prob, self.tokens)
                 )
 
-
 class BeamSearch(object):
     """Beam search."""
 
