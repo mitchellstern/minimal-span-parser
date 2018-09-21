@@ -26,7 +26,8 @@ def get_dependancies(fin, path_penn="src/pennconverter.jar"):
     """ Creates dependancy dictionary for each intput file"""
 
     command = 'java -jar {} < {} -splitSlash=false'.format(path_penn, fin)
-    proc = Popen(command, shell=True, stdout=PIPE, stderr=DEVNULL)
+    # proc = Popen(command, shell=True, stdout=PIPE, stderr=DEVNULL)
+    proc = Popen(command, shell=True, stdout=PIPE)
     results = proc.stdout.readlines()
     dependancies = []
     dependancy = []
