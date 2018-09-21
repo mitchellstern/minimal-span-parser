@@ -336,10 +336,15 @@ def run_test(args):
     start_time = time.time()
 
     test_predicted = []
+    if args.parser_type == "my":
+        predict_parms = {'astar_parms': args.astar_parms, 'beam_parms':args.beam_parms}
     for tree in test_treebank:
         dy.renew_cg()
         sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
-        predicted, _ = parser.parse(sentence)
+        if args.parser_type == "my":
+            predicted, _ = parser.parse(sentence, predict_parms=predict_parms)
+        else:
+            predicted, _ = parser.parse(sentence)
         test_predicted.append(predicted.convert())
 
     test_fscore = evaluate.evalb(args.evalb_dir, test_treebank, test_predicted)
