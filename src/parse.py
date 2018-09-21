@@ -506,15 +506,15 @@ class MyParser(object):
                                                             self.dec_lstm,
                                                             ws)
 
-            beams = []
+            grid = []
             for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
-                beam = []
+                row = []
                 for hyp in leaf_hyps:
                     labels = np.array(self.label_vocab.values)[hyp[0]].tolist()
                     partial_tree = trees.LeafMyParseNode(i, *leaf).deserialize(labels)
                     if partial_tree is not None:
-                        beam.append((partial_tree, hyp[1]))
-                beams.append(beam)
+                        row.append((partial_tree, hyp[1]))
+                grid.append(row)
 
-            tree =  astar_search(beams, self.keep_valence_value, astar_parms)
+            tree =  astar_search(grid, self.keep_valence_value, astar_parms)
             return tree, None
