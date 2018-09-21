@@ -496,13 +496,15 @@ class MyParser(object):
 
             return None, losses
 
-        # else:
         elif is_predict:
-            bs = BeamSearch(self.label_vocab.index(START),
-                            self.label_vocab.index(STOP),
-                            *beam_parms)
 
-            hyps = bs.beam_search(encode_outputs, self.label_embeddings, self.dec_lstm, ws)
+            start = self.label_vocab.index(START)
+            stop = self.label_vocab.index(STOP)
+            hyps = BeamSearch(start, stop, *beam_parms).beam_search(
+                                                            encode_outputs,
+                                                            self.label_embeddings,
+                                                            self.dec_lstm,
+                                                            ws)
 
             beams = []
             for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
