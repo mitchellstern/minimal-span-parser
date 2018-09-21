@@ -206,10 +206,7 @@ class InternalMyParseNode(MyParseNode):
             side = L if current.left > sibling.left else R
             if not keep_valence_value:
                 return side+ANY
-            elif isinstance(sibling, LeafMyParseNode):
-                return side+sibling.tag
-            else:
-                return side+sibling.label
+            return  side+sibling.bracket_label()
 
         # Recursion
         flag = CR
