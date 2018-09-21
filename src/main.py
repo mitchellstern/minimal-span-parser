@@ -81,19 +81,22 @@ def run_train(args):
         nodes = [tree]
         while nodes:
             node = nodes.pop()
-            if isinstance(node, trees.InternalParseNode):
-                label_vocab.index(node.label)
-                nodes.extend(reversed(node.children))
-            elif isinstance(node, trees.InternalMyParseNode):
-                nodes.extend(reversed(node.children))
-            elif isinstance(node, trees.LeafMyParseNode):
-                for l in node.labels:
-                    label_vocab.index(l)
-                tag_vocab.index(node.tag)
-                word_vocab.index(node.word)
+            if args.parser_type != 'my':
+                if isinstance(node, trees.InternalParseNode):
+                    label_vocab.index(node.label)
+                    nodes.extend(reversed(node.children))
+                else:
+                    tag_vocab.index(node.tag)
+                    word_vocab.index(node.word)
             else:
-                tag_vocab.index(node.tag)
-                word_vocab.index(node.word)
+                if isinstance(node, trees.InternalMyParseNode):
+                    nodes.extend(reversed(node.children))
+                else:
+                    for l in node.labels:
+                        label_vocab.index(l)
+                    tag_vocab.index(node.tag)
+                    word_vocab.index(node.word)
+
 
     tag_vocab.freeze()
     word_vocab.freeze()
