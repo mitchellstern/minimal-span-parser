@@ -120,21 +120,7 @@ def run_train(args):
 
     print("Initializing model...")
     model = dy.ParameterCollection()
-    if args.parser_type == "top-down":
-        parser = parse.TopDownParser(
-            model,
-            tag_vocab,
-            word_vocab,
-            label_vocab,
-            args.tag_embedding_dim,
-            args.word_embedding_dim,
-            args.lstm_layers,
-            args.lstm_dim,
-            args.label_hidden_dim,
-            args.split_hidden_dim,
-            args.dropout,
-        )
-    elif args.parser_type == "my":
+    if args.parser_type == "my":
         parser = parse.MyParser(
             model,
             tag_vocab,
@@ -149,6 +135,20 @@ def run_train(args):
             args.attention_dim,
             args.dropout,
             args.keep_valence_value
+        )
+    elif args.parser_type == "top-down":
+        parser = parse.TopDownParser(
+            model,
+            tag_vocab,
+            word_vocab,
+            label_vocab,
+            args.tag_embedding_dim,
+            args.word_embedding_dim,
+            args.lstm_layers,
+            args.lstm_dim,
+            args.label_hidden_dim,
+            args.split_hidden_dim,
+            args.dropout,
         )
     else:
         parser = parse.ChartParser(
@@ -281,12 +281,12 @@ def run_train(args):
             batch_losses = []
             for tree in train_parse[start_index:start_index + args.batch_size]:
                 sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
-                if args.parser_type == "top-down":
-                    _, loss = parser.parse(sentence, tree, args.explore)
-                    batch_losses.append(loss)
-                elif args.parser_type == "my":
+                if args.parser_type == "my":
                     _, losses = parser.parse(sentence, tree)
                     batch_losses.extend(losses)
+                elif args.parser_type == "top-down":
+                    _, loss = parser.parse(sentence, tree, args.explore)
+                    batch_losses.append(loss)
                 else:
                     _, loss = parser.parse(sentence, tree)
                     batch_losses.append(loss)
