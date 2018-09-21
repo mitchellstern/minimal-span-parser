@@ -59,6 +59,9 @@ def run_train(args):
     else:
         dependancies = get_dependancies(args.train_path)
         train_parse = [tree.myconvert(dep)(args.keep_valence_value) for tree, dep in zip(train_treebank, dependancies)]
+        print("Processing trees for development...")
+        dependancies = get_dependancies(args.dev_path)
+        dev_parse = [tree.myconvert(dep)(args.keep_valence_value) for tree, dep in zip(dev_treebank, dependancies)]
 
     print("Constructing vocabularies...")
 
@@ -167,8 +170,65 @@ def run_train(args):
     check_every = len(train_parse) / args.checks_per_epoch
     best_dev_fscore = -np.inf
     best_dev_model_path = None
+    best_dev_loss = np.inf
 
     start_time = time.time()
+
+    def my_check_dev():
+        nonlocal best_dev_loss
+        nonlocal best_dev_model_path
+
+        dev_start_time = time.time()
+
+        total_losses = []
+        for start_index in range(0, len(dev_parse), args.batch_size):
+            dy.renew_cg()
+            batch_losses = []
+            for tree in dev_parse[start_index:start_index + args.batch_size]:
+                sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
+                _, losses = parser.parse(sentence, tree, True)
+                batch_losses.extend(losses)
+            batch_loss = dy.average(batch_losses)
+            total_losses.append(batch_loss.scalar_value())
+
+            print(
+                "batch {:,}/{:,} "
+                "batch-loss {:.4f} "
+                "dev-elapsed {} "
+                "total-elapsed {}".format(
+                    start_index // args.batch_size + 1,
+                    int(np.ceil(len(dev_parse) / args.batch_size)),
+                    total_losses[-1],
+                    format_elapsed(dev_start_time),
+                    format_elapsed(start_time),
+                )
+            )
+
+        dev_loss = np.mean(total_losses)
+        print(
+            "dev-loss {} "
+            "dev-elapsed {} "
+            "total-elapsed {}".format(
+                dev_loss,
+                format_elapsed(dev_start_time),
+                format_elapsed(start_time),
+            )
+        )
+
+        if dev_loss < best_dev_loss:
+            if best_dev_model_path is not None:
+                for ext in [".data", ".meta"]:
+                    path = best_dev_model_path + ext
+                    if os.path.exists(path):
+                        print("Removing previous model file {}...".format(path))
+                        os.remove(path)
+
+            best_dev_loss = dev_loss
+            best_dev_model_path = "{}_dev={:.4f}".format(
+                args.model_path_base, dev_loss)
+            print("Saving new best model to {}...".format(best_dev_model_path))
+            dy.save(best_dev_model_path, [parser])
+
 
     def check_dev():
         nonlocal best_dev_fscore
@@ -181,9 +241,6 @@ def run_train(args):
             dy.renew_cg()
             sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
             predicted, _ = parser.parse(sentence)
-            tags, words = zip(*sentence)
-            print('sentence: {}\npredicted: {}'.format(' '.join(words),
-                                                predicted.convert().linearize()))
             dev_predicted.append(predicted.convert())
 
         dev_fscore = evaluate.evalb(args.evalb_dir, dev_treebank, dev_predicted)
@@ -260,7 +317,10 @@ def run_train(args):
 
             if current_processed >= check_every:
                 current_processed -= check_every
-                check_dev()
+                if args.parser_type == "my":
+                    my_check_dev()
+                else:
+                    check_dev()
 
 def run_test(args):
     print("Loading test trees from {}...".format(args.test_path))
