@@ -477,11 +477,10 @@ class MyParser(object):
                                         for label in decode_input[:-1]
                                         ]
 
-                encode_output_zeros = dy.zeros(encode_output.dim()[0])
-                intial_state = self.dec_lstm.initial_state([encode_output,
-                                                            encode_output_zeros]
-                                                            )
-                decode_output = dy.concatenate_cols(intial_state.transduce(label_embedding))
+                c_dec = encode_output
+                h_dec = dy.zeros(c_dec.dim()[0])
+                decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
+                decode_output = dy.concatenate_cols(decode_init.transduce(label_embedding))
                 key = affine(*ws[1], decode_output)
                 alpha = dy.softmax(query * key)
                 context = _encode_outputs * alpha
