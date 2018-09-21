@@ -435,6 +435,7 @@ class MyParser(object):
 
     def parse(self, sentence, gold=None, beam_parms=None, astar_parms=None):
         is_train = gold is not None
+        is_predict = beam_parms is not None and astar_parms is not None
 
         def affine(bias, weight, x, non_linearity=dy.rectify):
             x = dy.affine_transform([bias, weight, x])
@@ -495,7 +496,8 @@ class MyParser(object):
 
             return None, losses
 
-        else:
+        # else:
+        elif is_predict:
             bs = BeamSearch(self.label_vocab.index(START),
                             self.label_vocab.index(STOP),
                             *beam_parms)
