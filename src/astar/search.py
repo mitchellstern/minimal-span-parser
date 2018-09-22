@@ -114,18 +114,18 @@ class Solver(AStar):
         self.cl = ClosedList()
         self.seen = []
 
-    def heuristic_cost(self, node, goal, cost_coeff):
+    def heuristic_cost(self, node, goal, cost_coefficient):
         left = list(range(node.left))
         right = list(range(node.right, goal.right))
-        return cost_coeff * sum([self.grid[i][0][1] for i in chain(left, right)])
+        return cost_coefficient * sum([self.grid[i][0][1] for i in chain(left, right)])
 
     def real_cost(self, node):
         position = zip(range(node.left, node.right), node.rank)
         return sum([self.grid[i][rank][1] for i, rank in position])
 
-    def fscore(self, node, goal, cost_coeff):
+    def fscore(self, node, goal, cost_coefficient):
         real_cost = self.real_cost(node)
-        heuristic_cost = self.heuristic_cost(node, goal, cost_coeff)
+        heuristic_cost = self.heuristic_cost(node, goal, cost_coefficient)
         return real_cost + heuristic_cost
 
     def move_to_closed(self, node):

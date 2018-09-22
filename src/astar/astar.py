@@ -76,24 +76,27 @@ class AStar:
     #     else:
     #         return reversed(list(_gen()))
 
-    def astar(self, start, goal, num_goals, time_out, time_th, cost_coeff_rate, verbose=1):
-        current_time = start_time = time.clock()
-        cost_coeff = 1.
+    def astar(self, start, goal, n_goals, time_out, n_cost_reductions, cost_reduction_rate, verbose):
+
+        cost_coefficient = 1.
         searchNodes = AStar.SearchNodeDict()
         openSet = []
         goals = []
         for strt in  start:
             if self.is_goal_reached(strt, goal):
                 goals.append(strt)
-            cost = self.fscore(strt, goal, cost_coeff)
+            cost = self.fscore(strt, goal, cost_coefficient)
             startNode = searchNodes[strt] = AStar.SearchNode(strt, fscore=cost)
             heappush(openSet, startNode)
-        while (time.clock() - start_time < time_out) and openSet and len(goals) < int(num_goals):
+
+        total_time_out = time_out * n_cost_reductions
+        current_time = start_time = time.clock()
+        while (time.clock() - start_time < total_time_out) and openSet and len(goals) < int(n_goals):
             current = heappop(openSet)
-            if (time.clock() - current_time >= time_th):
-                cost_coeff *= cost_coeff_rate
+            if (time.clock() - current_time >= time_out):
+                cost_coefficient *= cost_reduction_rate
                 for t in openSet:
-                    t.fscore = self.fscore(t.data, goal, cost_coeff)
+                    t.fscore = self.fscore(t.data, goal, cost_coefficient)
                 current_time = time.clock()
             if verbose > 0: print(current.format_print('current'))
 
