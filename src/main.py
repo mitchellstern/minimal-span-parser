@@ -338,11 +338,21 @@ def run_test(args):
     test_predicted = []
     if args.parser_type == "my":
         predict_parms = {'astar_parms': args.astar_parms, 'beam_parms':args.beam_parms}
-    for tree in test_treebank:
+    for i, tree in  enumerate(test_treebank):
         dy.renew_cg()
         sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
         if args.parser_type == "my":
+            prediction_start_time = time.time()
             predicted, _ = parser.parse(sentence, predict_parms=predict_parms)
+            print(
+                "processed {:,} "
+                "prediction-elapsed {} "
+                "total-elapsed {}".format(
+                    i+1,
+                    format_elapsed(prediction_start_time),
+                    format_elapsed(start_time),
+                )
+            )
         else:
             predicted, _ = parser.parse(sentence)
         test_predicted.append(predicted.convert())
