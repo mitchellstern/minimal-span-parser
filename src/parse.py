@@ -517,6 +517,7 @@ class MyParser(object):
             astar_parms = predict_parms['astar_parms']
             nodes =  astar_search(grid, self.keep_valence_value, astar_parms)
             if nodes == []:
+                import pdb; pdb.set_trace()
                 children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
                 return trees.InternalMyParseNode('S', children)
             return nodes[0].trees[0], None
