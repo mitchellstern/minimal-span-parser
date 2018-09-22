@@ -157,7 +157,7 @@ class Solver(AStar):
                 return len(list(node.trees[0].missing_leaves()))==0
         return False
 
-def astar_search(grid, keep_valence_value, astar_parms, verbose=1):
+def astar_search(grid, keep_valence_value, astar_parms, verbose=0):
 
     n_words = len(grid)
     start = [AstarNode(idx, idx+1, [0], [grid[idx][0][0]]) for idx in range(n_words)]

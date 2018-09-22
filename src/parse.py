@@ -495,6 +495,7 @@ class MyParser(object):
             return None, losses
 
         else:
+            print('predicting for: {}'.format(sentence))
             beam_parms = predict_parms['beam_parms']
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
