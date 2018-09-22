@@ -433,9 +433,8 @@ class MyParser(object):
     def from_spec(cls, spec, model):
         return cls(model, **spec)
 
-    def parse(self, sentence, gold=None, beam_parms=None, astar_parms=None):
+    def parse(self, sentence, gold=None, is_dev=False, predict_parms=None):
         is_train = gold is not None
-        is_predict = beam_parms is not None and astar_parms is not None
 
         def affine(bias, weight, x, non_linearity=dy.rectify):
             x = dy.affine_transform([bias, weight, x])
@@ -443,7 +442,7 @@ class MyParser(object):
                 return x
             return non_linearity(x)
 
-        if is_train:
+        if is_train and not is_dev:
             self.enc_lstm.set_dropout(self.dropout)
             self.dec_lstm.set_dropout(self.dropout)
         else:
@@ -495,8 +494,8 @@ class MyParser(object):
 
             return None, losses
 
-        elif is_predict:
-
+        else:
+            beam_parms = predict_parms['beam_parms']
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
             hyps = BeamSearch(start, stop, *beam_parms).beam_search(
@@ -515,5 +514,6 @@ class MyParser(object):
                         row.append((partial_tree, hyp[1]))
                 grid.append(row)
 
+            astar_parms = predict_parms['astar_parms']
             tree =  astar_search(grid, self.keep_valence_value, astar_parms)
             return tree, None
