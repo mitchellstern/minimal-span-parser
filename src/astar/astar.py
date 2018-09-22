@@ -89,7 +89,7 @@ class AStar:
             cost = self.fscore(strt, goal, cost_coeff)
             startNode = searchNodes[strt] = AStar.SearchNode(strt, fscore=cost)
             heappush(openSet, startNode)
-        while (time.clock() - start_time < time_out) and openSet and len(goals) < num_goals:
+        while (time.clock() - start_time < time_out) and openSet and len(goals) < int(num_goals):
             current = heappop(openSet)
             if (time.clock() - current_time >= time_th):
                 cost_coeff *= cost_coeff_rate

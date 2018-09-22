@@ -415,7 +415,7 @@ def main():
     subparser.add_argument("--evalb-dir", default="EVALB/")
     subparser.add_argument("--test-path", default="data/23.auto.clean")
     subparser.add_argument("--parser-type", choices=["top-down", "chart", "my"], required=True)
-    subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2])
+    subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2], type=float)
     subparser.add_argument("--beam-parms", nargs=2, default=[5, 28], type=int)
 
 
