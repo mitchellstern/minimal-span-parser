@@ -56,7 +56,7 @@ class Hypothesis(object):
 class BeamSearch(object):
     """Beam search."""
 
-    def __init__(self, start_token, end_token, beam_size, max_steps):
+    def __init__(self, start_token, end_token, beam_size, max_steps=28):
         """Creates BeamSearch object.
 
         Args:

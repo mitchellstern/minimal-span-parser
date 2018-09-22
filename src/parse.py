@@ -494,13 +494,11 @@ class MyParser(object):
             return None, losses
 
         else:
-            beam_parms = predict_parms['beam_parms']
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
             astar_parms = predict_parms['astar_parms']
-
-            for beam_parms in [[5, 28],[10, 28]]:
-                hyps = BeamSearch(start, stop, *beam_parms).beam_search(
+            for beam_size in predict_parms['beam_parms']:
+                hyps = BeamSearch(start, stop, beam_size).beam_search(
                                                             encode_outputs,
                                                             self.label_embeddings,
                                                             self.dec_lstm,
@@ -519,11 +517,7 @@ class MyParser(object):
                 nodes = astar_search(grid, self.keep_valence_value, astar_parms)
                 if nodes != []:
                     return nodes[0].trees[0], None
-            # if nodes == []:
-            #     children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
-            #     tree = trees.InternalMyParseNode('S', children)
-            # else:
-                # tree = nodes[0].trees[0]
+
             children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
             tree = trees.InternalMyParseNode('S', children)
             return tree, None

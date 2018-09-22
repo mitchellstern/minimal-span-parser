@@ -337,7 +337,7 @@ def run_test(args):
 
     test_predicted = []
     if args.parser_type == "my":
-        predict_parms = {'astar_parms': args.astar_parms, 'beam_parms':args.beam_parms}
+        predict_parms = {'astar_parms': args.astar_parms, 'beam_parms':args.beam_size}
     for i, tree in  enumerate(test_treebank):
         dy.renew_cg()
         sentence = [(leaf.tag, leaf.word) for leaf in tree.leaves()]
@@ -417,7 +417,7 @@ def main():
     subparser.add_argument("--test-path", default="data/23.auto.clean")
     subparser.add_argument("--parser-type", choices=["top-down", "chart", "my"], required=True)
     subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2], type=float)
-    subparser.add_argument("--beam-parms", nargs=2, default=[5, 28], type=int)
+    subparser.add_argument("--beam-size", nargs='+', default=[5], type=int)
 
 
     args = parser.parse_args()
