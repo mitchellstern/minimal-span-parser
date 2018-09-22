@@ -409,10 +409,11 @@ class MyParser(object):
         self.label_embeddings = self.model.add_lookup_parameters(
             (label_vocab.size, 2 * lstm_dim))
 
+        state_size = embedding_dim + 2 * lstm_dim
         self.dec_lstm = dy.LSTMBuilder(
             1,
             2 * lstm_dim,
-            embedding_dim + 2 * lstm_dim,
+            state_size,
             self.model)
 
         self.weights = []
