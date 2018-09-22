@@ -165,6 +165,8 @@ def astar_search(grid, keep_valence_value, astar_parms, verbose=0):
     # let's solve it
     nodes = Solver(grid, keep_valence_value).astar(start, goal, *astar_parms, verbose)
 
-    if nodes == []:
-         return trees.LeafMyParseNode(0, '', '')
-    return nodes[0].trees[0]
+    return nodes
+    # if nodes == []:
+    #      # return trees.LeafMyParseNode(0, '', '')
+    #      return nodes
+    # return nodes[0].trees[0]
