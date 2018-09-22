@@ -77,7 +77,6 @@ class AStar:
     #         return reversed(list(_gen()))
 
     def astar(self, start, goal, num_goals, time_out, time_th, cost_coeff_rate, verbose=1):
-                # cost_coeff_rate, verbose=1, reverse_path = False):
         current_time = start_time = time.clock()
         cost_coeff = 1.
         searchNodes = AStar.SearchNodeDict()
@@ -99,7 +98,6 @@ class AStar:
             if verbose > 0: print(current.format_print('current'))
 
             if self.is_goal_reached(current.data, goal):
-                # goals.append(self.reconstruct_path(current, reverse_path))
                 goals.append(current.data)
             current.out_openset = True
             current.closed = True
