@@ -396,8 +396,6 @@ def main():
     subparser.add_argument("--checks-per-epoch", type=int, default=4)
     subparser.add_argument("--print-vocabs", action="store_true")
     subparser.add_argument("--keep-valence-value", action="store_true")
-    subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2])
-    subparser.add_argument("--beam-parms", nargs=2, default=[5, 28])
 
     subparser = subparsers.add_parser("test")
     subparser.set_defaults(callback=run_test)
@@ -406,6 +404,9 @@ def main():
     subparser.add_argument("--model-path-base", required=True)
     subparser.add_argument("--evalb-dir", default="EVALB/")
     subparser.add_argument("--test-path", default="data/23.auto.clean")
+    subparser.add_argument("--astar-parms", nargs=4, default=[1, 100., 10., 0.2])
+    subparser.add_argument("--beam-parms", nargs=2, default=[5, 28])
+
 
     args = parser.parse_args()
     args.callback(args)
