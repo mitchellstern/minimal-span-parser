@@ -498,27 +498,33 @@ class MyParser(object):
             beam_parms = predict_parms['beam_parms']
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
-            hyps = BeamSearch(start, stop, *beam_parms).beam_search(
+            astar_parms = predict_parms['astar_parms']
+
+            for beam_parms in [[5, 28],[10, 28]]:
+                hyps = BeamSearch(start, stop, *beam_parms).beam_search(
                                                             encode_outputs,
                                                             self.label_embeddings,
                                                             self.dec_lstm,
                                                             ws)
 
-            grid = []
-            for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
-                row = []
-                for hyp in leaf_hyps:
-                    labels = np.array(self.label_vocab.values)[hyp[0]].tolist()
-                    partial_tree = trees.LeafMyParseNode(i, *leaf).deserialize(labels)
-                    if partial_tree is not None:
-                        row.append((partial_tree, hyp[1]))
-                grid.append(row)
+                grid = []
+                for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
+                    row = []
+                    for hyp in leaf_hyps:
+                        labels = np.array(self.label_vocab.values)[hyp[0]].tolist()
+                        partial_tree = trees.LeafMyParseNode(i, *leaf).deserialize(labels)
+                        if partial_tree is not None:
+                            row.append((partial_tree, hyp[1]))
+                    grid.append(row)
 
-            astar_parms = predict_parms['astar_parms']
-            nodes =  astar_search(grid, self.keep_valence_value, astar_parms)
-            if nodes == []:
-                children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
-                tree = trees.InternalMyParseNode('S', children)
-            else:
-                tree = nodes[0].trees[0]
+                    nodes =  astar_search(grid, self.keep_valence_value, astar_parms)
+                    if nodes != []:
+                        return nodes[0].trees[0], None
+            # if nodes == []:
+            #     children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
+            #     tree = trees.InternalMyParseNode('S', children)
+            # else:
+                # tree = nodes[0].trees[0]
+            children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
+            tree = trees.InternalMyParseNode('S', children)
             return tree, None
