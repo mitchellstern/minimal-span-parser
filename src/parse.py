@@ -517,9 +517,9 @@ class MyParser(object):
                             row.append((partial_tree, hyp[1]))
                     grid.append(row)
 
-                    nodes =  astar_search(grid, self.keep_valence_value, astar_parms)
-                    if nodes != []:
-                        return nodes[0].trees[0], None
+                nodes =  astar_search(grid, self.keep_valence_value, astar_parms)
+                if nodes != []:
+                    return nodes[0].trees[0], None
             # if nodes == []:
             #     children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
             #     tree = trees.InternalMyParseNode('S', children)
