@@ -232,7 +232,9 @@ class InternalMyParseNode(MyParseNode):
         return ret_leaf_node
 
     def siblings(self):
-        return [child for child in self.parent.children if child != self]
+        for child in self.parent.children:
+            if child != self:
+                yield child
 
     def bracket_label(self):
         return self.label
@@ -284,7 +286,9 @@ class LeafMyParseNode(MyParseNode):
         return LeafMyParseNode(self.left, self.tag, self.word)
 
     def siblings(self):
-        return [child for child in self.parent.children if child != self]
+        for child in self.parent.children:
+            if child != self:
+                yield child
 
     def serialize(self, keep_valence_value):
         # self.label = tuple(self.tag)
@@ -324,7 +328,9 @@ class MissMyParseNode(MyParseNode):
         yield self
 
     def siblings(self):
-        return [child for child in self.parent.children if child != self]
+        for child in self.parent.children:
+            if child != self:
+                yield child
 
     def convert(self):
         return LeafTreebankNode(self.label, self.label)
