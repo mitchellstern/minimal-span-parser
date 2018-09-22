@@ -88,11 +88,16 @@ class BeamSearch(object):
         _encode_outputs = dy.concatenate_cols(encode_outputs)
         query = dy.transpose(dy.rectify(dy.affine_transform([*ws[0], _encode_outputs])))
         for encode_output in encode_outputs:
-            encode_output_zeros = dy.zeros(encode_output.dim()[0])
-            intial_state = dec_lstm.initial_state(
-                                [encode_output, encode_output_zeros])
+
+            c_dec = encode_output
+            h_dec = dy.zeros(c_dec.dim()[0])
+            decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
+
+            # encode_output_zeros = dy.zeros(encode_output.dim()[0])
+            # intial_state = dec_lstm.initial_state(
+            #                     [encode_output, encode_output_zeros])
             complete_hyps = []
-            hyps = [Hypothesis([self._start_token], [1.0], intial_state)]
+            hyps = [Hypothesis([self._start_token], [1.0], decode_init)]
             for steps in xrange(self._max_steps):
                 if hyps != []:
                     # Extend each hypothesis.
@@ -107,7 +112,8 @@ class BeamSearch(object):
                         alpha = dy.softmax(query * key)
                         context = _encode_outputs * alpha
                         x = dy.concatenate([decode_output, context])
-                        _probs = dy.softmax(dy.affine_transform([*ws[2], x]))
+                        x = dy.rectify(dy.affine_transform([*ws[2], x]))
+                        _probs = dy.softmax(dy.affine_transform([*ws[3], x]))
                         probs = _probs.npvalue()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]

@@ -407,23 +407,24 @@ class MyParser(object):
             dy.VanillaLSTMBuilder)
 
         self.label_embeddings = self.model.add_lookup_parameters(
-            (label_vocab.size, 2 * lstm_dim))
+            (label_vocab.size, label_embedding_dim))
 
         state_size = embedding_dim + 2 * lstm_dim
         self.dec_lstm = dy.LSTMBuilder(
             1,
-            2 * lstm_dim,
+            label_embedding_dim,
             state_size,
             self.model)
 
-        self.weights = []
-        self.biases = []
-        state_size = embedding_dim + 2 * lstm_dim
-        for _ in range(2):
-            self.weights.append(self.model.add_parameters((attention_dim, state_size)))
-            self.biases.append(self.model.add_parameters((attention_dim)))
-        self.weights.append(self.model.add_parameters((label_vocab.size, 2 * state_size)))
-        self.biases.append(self.model.add_parameters((label_vocab.size)))
+        self.ws = []
+        # rows = [attention_dim, attention_dim, 2 * state_size, label_vocab.size]
+        # cols = [state_size, state_size, label_hidden_dim, 2 * state_size]
+        rows = [attention_dim, attention_dim, label_hidden_dim, label_vocab.size]
+        cols = [state_size, state_size, 2 * state_size, label_hidden_dim]
+        for r,c in zip(rows, cols):
+            weight = self.model.add_parameters((r,c))
+            bias = self.model.add_parameters((r))
+            self.ws.append((bias, weight))
 
         self.dropout = dropout
 
@@ -464,13 +465,11 @@ class MyParser(object):
         encode_outputs = [dy.concatenate([e, l]) for e, l in zip(embeddings, lstm_outputs)]
         encode_outputs = encode_outputs[1:-1]
 
-        ws = [(dy.parameter(b), dy.parameter(w)) for b, w in zip(self.biases, self.weights)]
-
         if is_train:
             decode_inputs = [(START,) + tuple(leaf.labels) + (STOP,) for leaf in gold.leaves()]
             losses = []
             _encode_outputs = dy.concatenate_cols(encode_outputs)
-            query = dy.transpose(affine(*ws[0], _encode_outputs))
+            query = dy.transpose(affine(*self.ws[0], _encode_outputs))
             for encode_output, decode_input in zip(encode_outputs, decode_inputs):
 
                 label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
@@ -481,12 +480,11 @@ class MyParser(object):
                 h_dec = dy.zeros(c_dec.dim()[0])
                 decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
                 decode_output = dy.concatenate_cols(decode_init.transduce(label_embedding))
-                key = affine(*ws[1], decode_output)
+                key = affine(*self.ws[1], decode_output)
                 alpha = dy.softmax(query * key)
                 context = _encode_outputs * alpha
-                x = dy.concatenate([decode_output, context])
-                #TODO x = affine(*ws[3], x)
-                probs = affine(*ws[2], x, dy.softmax)
+                x =  affine(*self.ws[2], dy.concatenate([decode_output, context]))
+                probs = affine(*self.ws[3], x, dy.softmax)
                 log_prob = []
                 for i, label in enumerate(decode_input[1:]):
                     id = self.label_vocab.index(label)
@@ -506,7 +504,7 @@ class MyParser(object):
                                                             encode_outputs,
                                                             self.label_embeddings,
                                                             self.dec_lstm,
-                                                            ws)
+                                                            self.ws)
 
                 grid = []
                 for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
