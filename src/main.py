@@ -345,10 +345,11 @@ def run_test(args):
             prediction_start_time = time.time()
             predicted, _ = parser.parse(sentence, predict_parms=predict_parms)
             print(
-                "processed {:,} "
+                "processed {:,}/{:,} "
                 "prediction-elapsed {} "
                 "total-elapsed {}".format(
                     i+1,
+                    len(test_treebank),
                     format_elapsed(prediction_start_time),
                     format_elapsed(start_time),
                 )
