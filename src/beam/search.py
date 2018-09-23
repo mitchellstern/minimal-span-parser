@@ -41,11 +41,7 @@ class Hypothesis(object):
         """
         tokens = self.tokens + [token]
         probs = self.prob + [prob]
-
-        try:
-            score = self.score + math.log(prob)
-        except:
-            import pdb; pdb.set_trace()
+        score = self.score + math.log(prob)
         return Hypothesis(tokens, probs, new_state, score)
 
     @property
@@ -115,6 +111,7 @@ class BeamSearch(object):
                         x = dy.concatenate([decode_output, context])
                         attention = dy.rectify(dy.affine_transform([*ws['attention'], x]))
                         probs_expression = dy.softmax(dy.affine_transform([*ws['probs'], attention]))
+                        import pdb; pdb.set_trace()
                         probs = probs_expression.npvalue()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]
