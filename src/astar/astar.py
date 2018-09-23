@@ -108,7 +108,7 @@ class AStar:
             for neighbor in [searchNodes[n] for n in self.neighbors(current.data)]:
                 if neighbor.closed:
                     continue
-                neighbor.fscore = self.fscore(neighbor.data, goal, cost_coeff)
+                neighbor.fscore = self.fscore(neighbor.data, goal, cost_coefficient)
                 neighbor.came_from = current
 
                 if neighbor.out_openset:
