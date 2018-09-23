@@ -89,7 +89,7 @@ class BeamSearch(object):
         query = dy.transpose(dy.rectify(dy.affine_transform([*ws['query'], encode_outputs])))
         for encode_output in encode_outputs_list:
 
-            c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
+            c_dec = dy.affine_transform([*ws['c_dec'], encode_output])
             h_dec = dy.zeros(c_dec.dim()[0])
             decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
 
