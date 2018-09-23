@@ -452,7 +452,10 @@ class MyParser(object):
 
         def dropout(x,p):
             if use_dropout:
-                return dy.dropout(x,p)
+                if isinstance(x, list):
+                    return [dy.dropout(e,p) for e in x]
+                else:
+                    return dy.dropout(x,p)
             else:
                 return x
 
