@@ -111,12 +111,14 @@ class BeamSearch(object):
                         x = dy.concatenate([decode_output, context])
                         attention = dy.rectify(dy.affine_transform([*ws['attention'], x]))
                         probs_expression = dy.softmax(dy.affine_transform([*ws['probs'], attention]))
-                        import pdb; pdb.set_trace()
                         probs = probs_expression.npvalue()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]
-                        all_hyps.extend([hyp.extend_(idx, prob, new_state)
-                                    for idx, prob in zip(top_ids, top_probs)])
+                        try:
+                            all_hyps.extend([hyp.extend_(idx, prob, new_state)
+                                        for idx, prob in zip(top_ids, top_probs)])
+                        except:
+                            import pdb; pdb.set_trace()
                     hyps = []
 
                     for h in self.best_hyps(all_hyps):
