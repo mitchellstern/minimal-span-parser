@@ -448,14 +448,15 @@ class MyParser(object):
 
     def parse(self, sentence, gold=None, is_dev=False, predict_parms=None):
         is_train = gold is not None
+        use_dropout = is_train and not is_dev
 
-        # def affine(bias, weight, x, non_linearity=dy.rectify):
-        #     x = dy.affine_transform([bias, weight, x])
-        #     if non_linearity is None:
-        #         return x
-        #     return non_linearity(x)
+        def dropout(x,p):
+            if use_dropout:
+                return dy.dropout(x,p)
+            else:
+                return x
 
-        if is_train and not is_dev:
+        if use_dropout:
             self.enc_lstm.set_dropout(self.dropout)
             self.dec_lstm.set_dropout(self.dropout)
         else:
@@ -465,11 +466,13 @@ class MyParser(object):
         embeddings = []
         for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
             tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
+            tag_embedding = dropout(tag_embedding, self.dropout)
             if word not in (START, STOP):
                 count = self.word_vocab.count(word)
                 if not count or (is_train and np.random.rand() < 1 / (1 + count)):
                     word = UNK
             word_embedding = self.word_embeddings[self.word_vocab.index(word)]
+            word_embedding = dropout(word_embedding, self.dropout)
             embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
@@ -486,6 +489,7 @@ class MyParser(object):
                 label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
                                         for label in decode_input[:-1]
                                         ]
+                label_embedding = dropout(label_embedding, self.dropout)
                 c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
                 h_dec = dy.zeros(c_dec.dim()[0])
                 decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
