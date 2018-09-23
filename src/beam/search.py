@@ -114,11 +114,11 @@ class BeamSearch(object):
                         probs = probs_expression.npvalue()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]
-                        try:
-                            all_hyps.extend([hyp.extend_(idx, prob, new_state)
-                                        for idx, prob in zip(top_ids, top_probs)])
-                        except:
-                            import pdb; pdb.set_trace()
+                        for idx, prob in zip(top_ids, top_probs):
+                            if prob > 0:
+                                all_hyps.append(hyp.extend_(idx, prob, new_state))
+                        # all_hyps.extend([hyp.extend_(idx, prob, new_state)
+                        #             for idx, prob in zip(top_ids, top_probs)])
                     hyps = []
 
                     for h in self.best_hyps(all_hyps):
