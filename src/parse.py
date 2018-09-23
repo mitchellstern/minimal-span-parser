@@ -383,6 +383,7 @@ class MyParser(object):
             label_hidden_dim,
             dropout,
             keep_valence_value,
+            dropouts,
     ):
         self.spec = locals()
         self.spec.pop("self")
@@ -438,6 +439,7 @@ class MyParser(object):
             self.ws[key] = (bias, weight)
 
         self.dropout = dropout
+        self.dropouts = dropouts
 
     def param_collection(self):
         return self.model
@@ -460,8 +462,8 @@ class MyParser(object):
                 return x
 
         if use_dropout:
-            self.enc_lstm.set_dropout(self.dropout)
-            self.dec_lstm.set_dropout(self.dropout)
+            self.enc_lstm.set_dropout(self.dropouts[0])
+            self.dec_lstm.set_dropout(self.dropouts[1])
         else:
             self.enc_lstm.disable_dropout()
             self.dec_lstm.disable_dropout()
@@ -469,13 +471,13 @@ class MyParser(object):
         embeddings = []
         for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
             tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
-            tag_embedding = dropout(tag_embedding, self.dropout)
+            tag_embedding = dropout(tag_embedding, self.dropouts[2])
             if word not in (START, STOP):
                 count = self.word_vocab.count(word)
                 if not count or (is_train and np.random.rand() < 1 / (1 + count)):
                     word = UNK
             word_embedding = self.word_embeddings[self.word_vocab.index(word)]
-            word_embedding = dropout(word_embedding, self.dropout)
+            word_embedding = dropout(word_embedding, self.dropouts[3])
             embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
@@ -492,7 +494,7 @@ class MyParser(object):
                 label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
                                         for label in decode_input[:-1]
                                         ]
-                label_embedding = dropout(label_embedding, self.dropout)
+                label_embedding = dropout(label_embedding, self.dropouts[4])
                 c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
                 h_dec = dy.zeros(c_dec.dim()[0])
                 decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
