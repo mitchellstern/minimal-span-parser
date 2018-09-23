@@ -91,7 +91,7 @@ class BeamSearch(object):
 
             c_dec = dy.affine_transform([*ws['c_dec'], encode_output])
             h_dec = dy.zeros(c_dec.dim()[0])
-            decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
+            decode_init = dec_lstm.initial_state([c_dec, h_dec])
 
             complete_hyps = []
             hyps = [Hypothesis([self._start_token], [1.0], decode_init)]
