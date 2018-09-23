@@ -41,6 +41,7 @@ class Hypothesis(object):
         """
         tokens = self.tokens + [token]
         probs = self.prob + [prob]
+        import pdb; pdb.set_trace()
         score = self.score + math.log(prob)
         return Hypothesis(tokens, probs, new_state, score)
 
