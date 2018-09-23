@@ -378,8 +378,9 @@ class MyParser(object):
             label_embedding_dim,
             lstm_layers,
             lstm_dim,
-            label_hidden_dim,
+            dec_lstm_dim,
             attention_dim,
+            label_hidden_dim,
             dropout,
             keep_valence_value,
     ):
@@ -409,22 +410,32 @@ class MyParser(object):
         self.label_embeddings = self.model.add_lookup_parameters(
             (label_vocab.size, label_embedding_dim))
 
-        state_size = embedding_dim + 2 * lstm_dim
+
         self.dec_lstm = dy.LSTMBuilder(
             1,
             label_embedding_dim,
-            state_size,
+            # state_size,
+            dec_lstm_dim,
             self.model)
 
-        self.ws = []
+        # self.ws = []
         # rows = [attention_dim, attention_dim, 2 * state_size, label_vocab.size]
         # cols = [state_size, state_size, label_hidden_dim, 2 * state_size]
-        rows = [attention_dim, attention_dim, label_hidden_dim, label_vocab.size]
-        cols = [state_size, state_size, 2 * state_size, label_hidden_dim]
-        for r,c in zip(rows, cols):
-            weight = self.model.add_parameters((r,c))
-            bias = self.model.add_parameters((r))
-            self.ws.append((bias, weight))
+        # rows = [attention_dim, attention_dim, label_hidden_dim, label_vocab.size]
+        # cols = [state_size, state_size, 2 * state_size, label_hidden_dim]
+        self.ws = {}
+        enc_out_dim = embedding_dim + 2 * lstm_dim
+        dec_attend_dim = enc_out_dim + dec_lstm_dim
+
+        keys = ['query', 'c_dec', 'key', 'attention','probs']
+        next_dims = [attention_dim, dec_lstm_dim, attention_dim, label_hidden_dim, label_vocab.size]
+        prev_dims = [enc_out_dim, enc_out_dim, dec_lstm_dim,  dec_attend_dim, label_hidden_dim]
+
+        for key,next_dim,prev_dim in zip(keys, next_dims, prev_dims):
+            weight = self.model.add_parameters((next_dim,prev_dim))
+            bias = self.model.add_parameters((next_dim))
+            # self.ws.append((bias, weight))
+            self.ws[key] = (bias, weight)
 
         self.dropout = dropout
 
@@ -438,11 +449,11 @@ class MyParser(object):
     def parse(self, sentence, gold=None, is_dev=False, predict_parms=None):
         is_train = gold is not None
 
-        def affine(bias, weight, x, non_linearity=dy.rectify):
-            x = dy.affine_transform([bias, weight, x])
-            if non_linearity is None:
-                return x
-            return non_linearity(x)
+        # def affine(bias, weight, x, non_linearity=dy.rectify):
+        #     x = dy.affine_transform([bias, weight, x])
+        #     if non_linearity is None:
+        #         return x
+        #     return non_linearity(x)
 
         if is_train and not is_dev:
             self.enc_lstm.set_dropout(self.dropout)
@@ -462,29 +473,30 @@ class MyParser(object):
             embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
-        encode_outputs = [dy.concatenate([e, l]) for e, l in zip(embeddings, lstm_outputs)]
-        encode_outputs = encode_outputs[1:-1]
+        encode_outputs_list = [dy.concatenate([e, l]) for e, l in zip(embeddings, lstm_outputs)][1:-1]
 
         if is_train:
             decode_inputs = [(START,) + tuple(leaf.labels) + (STOP,) for leaf in gold.leaves()]
             losses = []
-            _encode_outputs = dy.concatenate_cols(encode_outputs)
-            query = dy.transpose(affine(*self.ws[0], _encode_outputs))
-            for encode_output, decode_input in zip(encode_outputs, decode_inputs):
-
+            encode_outputs = dy.concatenate_cols(encode_outputs_list)
+            # query = dy.transpose(affine(*self.ws[0], _encode_outputs))
+            query_t = dy.rectify(dy.affine_transform([*self.ws['query'], encode_outputs]))
+            query = dy.transpose(query_t)
+            for encode_output, decode_input in zip(encode_outputs_list, decode_inputs):
                 label_embedding = [self.label_embeddings[self.label_vocab.index(label)]
                                         for label in decode_input[:-1]
                                         ]
-
-                c_dec = encode_output
+                c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
                 h_dec = dy.zeros(c_dec.dim()[0])
                 decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
-                decode_output = dy.concatenate_cols(decode_init.transduce(label_embedding))
-                key = affine(*self.ws[1], decode_output)
+                decode_output_list = decode_init.transduce(label_embedding)
+                decode_output = dy.concatenate_cols(decode_output_list)
+                key = dy.rectify(dy.affine_transform([*self.ws['key'], decode_output]))
                 alpha = dy.softmax(query * key)
-                context = _encode_outputs * alpha
-                x =  affine(*self.ws[2], dy.concatenate([decode_output, context]))
-                probs = affine(*self.ws[3], x, dy.softmax)
+                context = encode_outputs * alpha
+                x = dy.concatenate([decode_output, context])
+                attention = dy.rectify(dy.affine_transform([*self.ws['attention'], x]))
+                probs = dy.softmax(dy.affine_transform([*self.ws['probs'], attention]))
                 log_prob = []
                 for i, label in enumerate(decode_input[1:]):
                     id = self.label_vocab.index(label)
@@ -499,7 +511,7 @@ class MyParser(object):
             astar_parms = predict_parms['astar_parms']
             for beam_size in predict_parms['beam_parms']:
                 hyps = BeamSearch(start, stop, beam_size).beam_search(
-                                                            encode_outputs,
+                                                            encode_outputs_list,
                                                             self.label_embeddings,
                                                             self.dec_lstm,
                                                             self.ws)

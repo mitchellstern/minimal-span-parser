@@ -70,7 +70,7 @@ class BeamSearch(object):
         self._end_token = end_token
         self._max_steps = max_steps
 
-    def beam_search(self, encode_outputs, label_embeddings, dec_lstm, ws):
+    def beam_search(self, encode_outputs_list, label_embeddings, dec_lstm, ws):
         """Performs beam search for decoding.
 
          Args:
@@ -85,17 +85,14 @@ class BeamSearch(object):
 
         hyps_per_sentence = []
         #iterate over words in seq
-        _encode_outputs = dy.concatenate_cols(encode_outputs)
-        query = dy.transpose(dy.rectify(dy.affine_transform([*ws[0], _encode_outputs])))
-        for encode_output in encode_outputs:
+        encode_outputs = dy.concatenate_cols(encode_outputs_list)
+        query = dy.transpose(dy.rectify(dy.affine_transform([*ws['query'], encode_outputs])))
+        for encode_output in encode_outputs_list:
 
-            c_dec = encode_output
+            c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
             h_dec = dy.zeros(c_dec.dim()[0])
             decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
 
-            # encode_output_zeros = dy.zeros(encode_output.dim()[0])
-            # intial_state = dec_lstm.initial_state(
-            #                     [encode_output, encode_output_zeros])
             complete_hyps = []
             hyps = [Hypothesis([self._start_token], [1.0], decode_init)]
             for steps in xrange(self._max_steps):
@@ -108,13 +105,13 @@ class BeamSearch(object):
                         label_embedding = label_embeddings[hyp.latest_token]
                         new_state = hyp.state.add_input(label_embedding)
                         decode_output = new_state.output()
-                        key = dy.rectify(dy.affine_transform([*ws[1], decode_output]))
+                        key = dy.rectify(dy.affine_transform([*ws['key'], decode_output]))
                         alpha = dy.softmax(query * key)
-                        context = _encode_outputs * alpha
+                        context = encode_outputs * alpha
                         x = dy.concatenate([decode_output, context])
-                        x = dy.rectify(dy.affine_transform([*ws[2], x]))
-                        _probs = dy.softmax(dy.affine_transform([*ws[3], x]))
-                        probs = _probs.npvalue()
+                        attention = dy.rectify(dy.affine_transform([*ws['attention'], x]))
+                        probs_expression = dy.softmax(dy.affine_transform([*ws['probs'], attention]))
+                        probs = probs_expression.npvalue()
                         top_ids = np.argsort(probs)[-self._beam_size:]
                         top_probs = probs[top_ids]
                         all_hyps.extend([hyp.extend_(idx, prob, new_state)
