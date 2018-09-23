@@ -451,6 +451,7 @@ class MyParser(object):
         use_dropout = is_train and not is_dev
 
         def dropout(x,p):
+            import pdb; pdb.set_trace()
             if use_dropout:
                 if isinstance(x, list):
                     return [dy.dropout(e,p) for e in x]
