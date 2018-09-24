@@ -1,4 +1,5 @@
 import functools
+import collections
 
 import dynet as dy
 import numpy as np
@@ -415,28 +416,23 @@ class MyParser(object):
         self.dec_lstm = dy.LSTMBuilder(
             1,
             label_embedding_dim,
-            # state_size,
             dec_lstm_dim,
             self.model)
 
-        # self.ws = []
-        # rows = [attention_dim, attention_dim, 2 * state_size, label_vocab.size]
-        # cols = [state_size, state_size, label_hidden_dim, 2 * state_size]
-        # rows = [attention_dim, attention_dim, label_hidden_dim, label_vocab.size]
-        # cols = [state_size, state_size, 2 * state_size, label_hidden_dim]
-        self.ws = {}
         enc_out_dim = embedding_dim + 2 * lstm_dim
         dec_attend_dim = enc_out_dim + dec_lstm_dim
-
-        keys = ['query', 'c_dec', 'key', 'attention','probs']
-        next_dims = [attention_dim, dec_lstm_dim, attention_dim, label_hidden_dim, label_vocab.size]
-        prev_dims = [enc_out_dim, enc_out_dim, dec_lstm_dim,  dec_attend_dim, label_hidden_dim]
-
-        for key,next_dim,prev_dim in zip(keys, next_dims, prev_dims):
-            weight = self.model.add_parameters((next_dim,prev_dim))
-            bias = self.model.add_parameters((next_dim))
-            # self.ws.append((bias, weight))
-            self.ws[key] = (bias, weight)
+        Weights = collections.namedtuple('Weights', 'name prev_dim next_dim')
+        ws = []
+        ws.append(Weights(name='query', prev_dim=enc_out_dim, next_dim=attention_dim))
+        ws.append(Weights(name='c_dec', prev_dim=enc_out_dim, next_dim=dec_lstm_dim))
+        ws.append(Weights(name='key', prev_dim=dec_lstm_dim, next_dim=attention_dim))
+        ws.append(Weights(name='attention', prev_dim=dec_attend_dim, next_dim=label_hidden_dim))
+        ws.append(Weights(name='probs', prev_dim=label_hidden_dim, next_dim=label_vocab.size))
+        self.ws = {}
+        for w in ws:
+            weight = self.model.add_parameters((w.next_dim, w.prev_dim))
+            bias = self.model.add_parameters((w.next_dim))
+            self.ws[w.name] = (bias, weight)
 
         self.dropout = dropout
         self.dropouts = dropouts
