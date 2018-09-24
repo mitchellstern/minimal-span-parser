@@ -240,12 +240,6 @@ class InternalMyParseNode(MyParseNode):
         return self.label
 
     def combine(self, node_to_merge, node_to_remove):
-        # assert isinstance(node_to_merge, trees.InternalMyParseNode)
-        # assert (node_to_merge.label in [trees.CL, trees.CR])
-        # assert len(node_to_merge.children) == 1
-        # assert isinstance(node_to_remove, trees.MissMyParseNode)
-        # assert (node_to_remove in self.leaves())
-
         tree = self
         children = []
         for child in tree.children:
