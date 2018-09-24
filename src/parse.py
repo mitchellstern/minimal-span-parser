@@ -536,6 +536,9 @@ class MyParser(object):
             return None, losses
 
         else:
+            import cProfile
+            profile = cProfile.Profile()
+
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
             astar_parms = predict_parms['astar_parms']
@@ -556,7 +559,12 @@ class MyParser(object):
                             row.append((partial_tree, hyp[1]))
                     grid.append(row)
 
+
+                profile.enable()
                 nodes = astar_search(grid, self.keep_valence_value, astar_parms)
+                profile.disable()
+                profile.print_stats()
+
                 if nodes != []:
                     return nodes[0].trees[0], None
 
