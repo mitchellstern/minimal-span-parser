@@ -373,12 +373,15 @@ class MyParser(object):
             model,
             tag_vocab,
             word_vocab,
+            char_vocab,
             label_vocab,
             tag_embedding_dim,
             word_embedding_dim,
+            char_embedding_dim,
             label_embedding_dim,
             lstm_layers,
             lstm_dim,
+            char_lstm_dim,
             dec_lstm_dim,
             attention_dim,
             label_hidden_dim,
@@ -393,6 +396,7 @@ class MyParser(object):
         self.tag_vocab = tag_vocab
         self.word_vocab = word_vocab
         self.label_vocab = label_vocab
+        self.char_vocab = char_vocab
         self.keep_valence_value = keep_valence_value
         self.lstm_dim = lstm_dim
 
@@ -401,7 +405,7 @@ class MyParser(object):
         self.word_embeddings = self.model.add_lookup_parameters(
             (word_vocab.size, word_embedding_dim))
 
-        embedding_dim = tag_embedding_dim + word_embedding_dim
+        embedding_dim = tag_embedding_dim + word_embedding_dim + char_lstm_dim
         self.enc_lstm = dy.BiRNNBuilder(
             lstm_layers,
             embedding_dim,
@@ -409,9 +413,17 @@ class MyParser(object):
             self.model,
             dy.VanillaLSTMBuilder)
 
+        self.char_embeddings = self.model.add_lookup_parameters(
+            (char_vocab.size, char_embedding_dim))
+
+        self.char_lstm = dy.LSTMBuilder(
+            1,
+            char_embedding_dim,
+            char_lstm_dim,
+            self.model)
+
         self.label_embeddings = self.model.add_lookup_parameters(
             (label_vocab.size, label_embedding_dim))
-
 
         self.dec_lstm = dy.LSTMBuilder(
             1,
@@ -458,16 +470,21 @@ class MyParser(object):
             dropouts = [0.]*len(self.dropouts)
 
         embeddings = []
+        char_lstm = self.char_lstm.initial_state()
         for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
+            chars_embedding = []
             tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
             tag_embedding = dy.dropout(tag_embedding, dropouts[2])
             if word not in (START, STOP):
                 count = self.word_vocab.count(word)
                 if not count or (is_train and np.random.rand() < 1 / (1 + count)):
                     word = UNK
+            for c in [START] + list(word) + [STOP]:
+                chars_embedding.append(self.char_embeddings[self.char_vocab.index(c)])
+            word_char_embedding = char_lstm.transduce(chars_embedding)[-1]
             word_embedding = self.word_embeddings[self.word_vocab.index(word)]
             word_embedding = dy.dropout(word_embedding, dropouts[3])
-            embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
+            embeddings.append(dy.concatenate([tag_embedding, word_embedding, word_char_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
         encode_outputs_list = []

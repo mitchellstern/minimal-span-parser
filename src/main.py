@@ -74,6 +74,13 @@ def run_train(args):
     word_vocab.index(parse.STOP)
     word_vocab.index(parse.UNK)
 
+    if args.parser_type == 'my':
+        char_vocab = vocabulary.Vocabulary()
+        char_vocab.index(parse.START)
+        char_vocab.index(parse.STOP)
+        for c in parse.START+parse.STOP+parse.UNK:
+            char_vocab.index(c)
+
     label_vocab = vocabulary.Vocabulary()
     if args.parser_type != 'my':
         label_vocab.index(())
@@ -98,6 +105,8 @@ def run_train(args):
                 else:
                     for l in node.labels:
                         label_vocab.index(l)
+                    for c in node.word:
+                        char_vocab.index(c)
                     tag_vocab.index(node.tag)
                     word_vocab.index(node.word)
 
@@ -105,6 +114,8 @@ def run_train(args):
     tag_vocab.freeze()
     word_vocab.freeze()
     label_vocab.freeze()
+    if args.parser_type == 'my':
+        char_vocab.freeze()
 
     def print_vocabulary(name, vocab):
         special = {parse.START, parse.STOP, parse.UNK}
@@ -125,12 +136,15 @@ def run_train(args):
             model,
             tag_vocab,
             word_vocab,
+            char_vocab,
             label_vocab,
             args.tag_embedding_dim,
             args.word_embedding_dim,
+            args.char_embedding_dim,
             args.label_embedding_dim,
             args.lstm_layers,
             args.lstm_dim,
+            args.char_lstm_dim,
             args.dec_lstm_dim,
             args.attention_dim,
             args.label_hidden_dim,
@@ -392,9 +406,11 @@ def main():
     subparser.add_argument("--parser-type", choices=["top-down", "chart", "my"], required=True)
     subparser.add_argument("--tag-embedding-dim", type=int, default=50)
     subparser.add_argument("--word-embedding-dim", type=int, default=100)
+    subparser.add_argument("--char-embedding-dim", type=int, default=50)
     subparser.add_argument("--label-embedding-dim", type=int, default=100)
     subparser.add_argument("--lstm-layers", type=int, default=2)
     subparser.add_argument("--lstm-dim", type=int, default=250)
+    subparser.add_argument("--char-lstm-dim", type=int, default=100)
     subparser.add_argument("--dec-lstm-dim", type=int, default=600)
     subparser.add_argument("--attention-dim", type=int, default=250)
     subparser.add_argument("--label-hidden-dim", type=int, default=250)
