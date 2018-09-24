@@ -470,15 +470,18 @@ class MyParser(object):
             embeddings.append(dy.concatenate([tag_embedding, word_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
-        encode_outputs_list = [dy.concatenate([e, l]) for e, l in zip(embeddings, lstm_outputs)][1:-1]
+        encode_outputs_list = []
+        for e, l in zip(embeddings[1:-1], lstm_outputs[1:-1]):
+            encode_outputs_list.append(dy.concatenate([e, l]))
 
         if is_train:
             decode_inputs = [(START,) + tuple(leaf.labels) + (STOP,) for leaf in gold.leaves()]
             losses = []
             encode_outputs = dy.concatenate_cols(encode_outputs_list)
-            # query = dy.transpose(affine(*self.ws[0], _encode_outputs))
-            query_t = dy.rectify(dy.affine_transform([*self.ws['query'], encode_outputs]))
-            query = dy.transpose(query_t)
+
+            q = dy.affine_transform([*self.ws['query'], encode_outputs]))
+            query = dy.transpose(dy.rectify(q))
+
             for encode_output, decode_input in zip(encode_outputs_list, decode_inputs):
 
                 label_embedding = []
@@ -491,12 +494,18 @@ class MyParser(object):
                 decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
                 decode_output_list = decode_init.transduce(label_embedding)
                 decode_output = dy.concatenate_cols(decode_output_list)
-                key = dy.rectify(dy.affine_transform([*self.ws['key'], decode_output]))
+
+                k = dy.affine_transform([*self.ws['key'], decode_output])
+                key = dy.rectify(k)
                 alpha = dy.softmax(query * key)
                 context = encode_outputs * alpha
                 x = dy.concatenate([decode_output, context])
-                attention = dy.rectify(dy.affine_transform([*self.ws['attention'], x]))
-                probs = dy.softmax(dy.affine_transform([*self.ws['probs'], attention]))
+                a = dy.affine_transform([*self.ws['attention'], x])
+                attention = dy.rectify(a)
+
+                p = dy.affine_transform([*self.ws['probs'], attention])
+                probs = dy.softmax(p)
+
                 log_prob = []
                 for i, label in enumerate(decode_input[1:]):
                     id = self.label_vocab.index(label)
