@@ -400,7 +400,7 @@ def main():
     subparser.add_argument("--label-hidden-dim", type=int, default=250)
     subparser.add_argument("--split-hidden-dim", type=int, default=250)
     subparser.add_argument("--dropout", type=float, default=0.4)
-    subparser.add_argument("--dropouts", nargs='+', type=float) #TODO
+    subparser.add_argument("--dropouts", nargs='+', type=float, default=[0.4, 0.4, 0., 0., 0.])
     subparser.add_argument("--explore", action="store_true")
     subparser.add_argument("--model-path-base", required=True)
     subparser.add_argument("--evalb-dir", default="EVALB/")
