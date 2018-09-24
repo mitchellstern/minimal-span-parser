@@ -536,6 +536,9 @@ class MyParser(object):
             return None, losses
 
         else:
+            import cProfile
+            profile = cProfile.Profile()
+
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
             astar_parms = predict_parms['astar_parms']
