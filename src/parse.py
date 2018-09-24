@@ -518,7 +518,7 @@ class MyParser(object):
             start = self.label_vocab.index(START)
             stop = self.label_vocab.index(STOP)
             astar_parms = predict_parms['astar_parms']
-            for beam_size in predict_parms['beam_parms']:
+            for beam_size in predict_parms['beam_parms']+[self.label_vocab.size]:
                 hyps = BeamSearch(start, stop, beam_size).beam_search(
                                                             encode_outputs_list,
                                                             self.label_embeddings,
