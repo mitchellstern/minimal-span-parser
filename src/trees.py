@@ -285,7 +285,6 @@ class LeafMyParseNode(MyParseNode):
                 yield child
 
     def serialize(self, keep_valence_value):
-        # self.label = tuple(self.tag)
         self.labels = []
         return self
 
