@@ -463,10 +463,12 @@ class MyParser(object):
         if use_dropout:
             dropouts = self.dropouts
             self.enc_lstm.set_dropout(dropouts[0])
+            self.char_lstm.set_dropout(dropouts[1])
             self.dec_lstm.set_dropout(dropouts[1])
         else:
             self.enc_lstm.disable_dropout()
             self.dec_lstm.disable_dropout()
+            self.char_lstm.disable_dropout()
             dropouts = [0.]*len(self.dropouts)
 
         embeddings = []
