@@ -479,7 +479,7 @@ class MyParser(object):
             losses = []
             encode_outputs = dy.concatenate_cols(encode_outputs_list)
 
-            q = dy.affine_transform([*self.ws['query'], encode_outputs]))
+            q = dy.affine_transform([*self.ws['query'], encode_outputs])
             query = dy.transpose(dy.rectify(q))
 
             for encode_output, decode_input in zip(encode_outputs_list, decode_inputs):
