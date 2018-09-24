@@ -1,7 +1,9 @@
 from itertools import chain
+import numpy as np
+
 from .astar import AStar
 import trees
-import numpy as np
+
 
 class AstarNode(object):
 
