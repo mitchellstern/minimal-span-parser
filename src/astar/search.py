@@ -1,4 +1,5 @@
 from itertools import chain
+# import functools
 import numpy as np
 
 from .astar import AStar
@@ -48,6 +49,7 @@ class AstarNode(object):
         assert isinstance(self.trees, list)
         assert len(self.trees) == 2
 
+        # @functools.lru_cache(maxsize=None)
         def helper(_trees, comb_side, miss_side):
 
             assert isinstance(_trees[0], trees.InternalMyParseNode)
