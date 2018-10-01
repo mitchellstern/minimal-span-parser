@@ -385,7 +385,6 @@ class MyParser(object):
             dec_lstm_dim,
             attention_dim,
             label_hidden_dim,
-            dropout,
             keep_valence_value,
             dropouts,
     ):
@@ -436,9 +435,7 @@ class MyParser(object):
         Weights = collections.namedtuple('Weights', 'name prev_dim next_dim')
         ws = []
         ws.append(Weights(name='key', prev_dim=enc_out_dim, next_dim=attention_dim))
-        # ws.append(Weights(name='c_dec', prev_dim=enc_out_dim, next_dim=dec_lstm_dim))
         ws.append(Weights(name='query', prev_dim=dec_lstm_dim, next_dim=attention_dim))
-        # ws.append(Weights(name='attention', prev_dim=dec_attend_dim, next_dim=label_hidden_dim))
         ws.append(Weights(name='probs', prev_dim=dec_lstm_dim, next_dim=label_vocab.size))
         self.ws = {}
         for w in ws:

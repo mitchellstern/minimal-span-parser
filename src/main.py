@@ -150,7 +150,6 @@ def run_train(args):
             args.dec_lstm_dim,
             args.attention_dim,
             args.label_hidden_dim,
-            args.dropout,
             args.keep_valence_value,
             args.dropouts
         )
