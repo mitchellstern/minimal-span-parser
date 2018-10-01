@@ -425,21 +425,21 @@ class MyParser(object):
         self.label_embeddings = self.model.add_lookup_parameters(
             (label_vocab.size, label_embedding_dim))
 
+        enc_out_dim = embedding_dim + 2 * lstm_dim
         self.dec_lstm = dy.LSTMBuilder(
             1,
-            label_embedding_dim,
+            label_embedding_dim + enc_out_dim,
             dec_lstm_dim,
             self.model)
 
-        enc_out_dim = embedding_dim + 2 * lstm_dim
         dec_attend_dim = enc_out_dim + dec_lstm_dim
         Weights = collections.namedtuple('Weights', 'name prev_dim next_dim')
         ws = []
         ws.append(Weights(name='key', prev_dim=enc_out_dim, next_dim=attention_dim))
-        ws.append(Weights(name='c_dec', prev_dim=enc_out_dim, next_dim=dec_lstm_dim))
+        # ws.append(Weights(name='c_dec', prev_dim=enc_out_dim, next_dim=dec_lstm_dim))
         ws.append(Weights(name='query', prev_dim=dec_lstm_dim, next_dim=attention_dim))
-        ws.append(Weights(name='attention', prev_dim=dec_attend_dim, next_dim=label_hidden_dim))
-        ws.append(Weights(name='probs', prev_dim=label_hidden_dim, next_dim=label_vocab.size))
+        # ws.append(Weights(name='attention', prev_dim=dec_attend_dim, next_dim=label_hidden_dim))
+        ws.append(Weights(name='probs', prev_dim=dec_lstm_dim, next_dim=label_vocab.size))
         self.ws = {}
         for w in ws:
             weight = self.model.add_parameters((w.next_dim, w.prev_dim))
@@ -505,27 +505,23 @@ class MyParser(object):
 
             for encode_output, decode_input in zip(encode_outputs_list, decode_inputs):
 
-                label_embedding = []
-                for label in decode_input[:-1]:
+                decode_output = []
+                for i,label in enumerate(decode_input[:-1]):
                     e = self.label_embeddings[self.label_vocab.index(label)]
-                    label_embedding.append(dy.dropout(e, dropouts[6]))
+                    le = dy.dropout(e, dropouts[6])
+                    if i == 0:
+                        s_dec = self.dec_lstm.initial_state()
+                        context = encode_output
+                    else:
+                        query = dy.affine_transform([*self.ws['query'], s_dec.output()])
+                        query = dy.rectify(query)
+                        alpha = dy.softmax(key * query)
+                        context = encode_outputs * alpha
 
-                c_dec = dy.affine_transform([*self.ws['c_dec'], encode_output])
-                h_dec = dy.zeros(c_dec.dim()[0])
-                decode_init = self.dec_lstm.initial_state([c_dec, h_dec])
-
-                decode_output_list = decode_init.transduce(label_embedding)
-                decode_output = dy.concatenate_cols(decode_output_list)
-
-                query = dy.affine_transform([*self.ws['query'], decode_output])
-                # key = dy.rectify(k)
-                alpha = dy.softmax(key * query)
-                context = encode_outputs * alpha
-                x = dy.concatenate([decode_output, context])
-                a = dy.affine_transform([*self.ws['attention'], x])
-                attention = dy.rectify(a)
-
-                p = dy.affine_transform([*self.ws['probs'], attention])
+                    s_dec = s_dec.add_input(dy.concatenate([le, context]))
+                    decode_output.append(s_dec.output())
+                decode_output = dy.concatenate_cols(decode_output)
+                p = dy.affine_transform([*self.ws['probs'], decode_output])
                 probs = dy.softmax(p)
 
                 log_prob = []
