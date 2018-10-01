@@ -58,10 +58,12 @@ def run_train(args):
         train_parse = [tree.convert() for tree in train_treebank]
     else:
         dependancies = get_dependancies(args.train_path)
-        train_parse = [tree.myconvert(dep)(args.keep_valence_value) for tree, dep in zip(train_treebank, dependancies)]
+        train_parse = [tree.myconvert(dep)(args.keep_valence_value)
+                            for tree, dep in zip(train_treebank, dependancies)]
         print("Processing trees for development...")
         dependancies = get_dependancies(args.dev_path)
-        dev_parse = [tree.myconvert(dep)(args.keep_valence_value) for tree, dep in zip(dev_treebank, dependancies)]
+        dev_parse = [tree.myconvert(dep)(args.keep_valence_value)
+                            for tree, dep in zip(dev_treebank, dependancies)]
 
     print("Constructing vocabularies...")
 

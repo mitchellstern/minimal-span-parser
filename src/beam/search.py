@@ -86,7 +86,7 @@ class BeamSearch(object):
         hyps_per_sentence = []
         #iterate over words in seq
         encode_outputs = dy.concatenate_cols(encode_outputs_list)
-        query = dy.transpose(dy.rectify(dy.affine_transform([*ws['query'], encode_outputs])))
+        key = dy.transpose(dy.rectify(dy.affine_transform([*ws['key'], encode_outputs])))
         for encode_output in encode_outputs_list:
 
             c_dec = dy.affine_transform([*ws['c_dec'], encode_output])
@@ -105,8 +105,9 @@ class BeamSearch(object):
                         label_embedding = label_embeddings[hyp.latest_token]
                         new_state = hyp.state.add_input(label_embedding)
                         decode_output = new_state.output()
-                        key = dy.rectify(dy.affine_transform([*ws['key'], decode_output]))
-                        alpha = dy.softmax(query * key)
+                        # key = dy.rectify(dy.affine_transform([*ws['key'], decode_output]))
+                        query = dy.affine_transform([*ws['query'], decode_output])
+                        alpha = dy.softmax(key * query)
                         context = encode_outputs * alpha
                         x = dy.concatenate([decode_output, context])
                         attention = dy.rectify(dy.affine_transform([*ws['attention'], x]))
