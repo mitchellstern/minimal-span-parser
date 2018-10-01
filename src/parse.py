@@ -1,9 +1,12 @@
 import functools
+import collections
 
 import dynet as dy
 import numpy as np
 
 import trees
+from beam.search import BeamSearch
+from astar.search import astar_search
 
 START = "<START>"
 STOP = "<STOP>"
@@ -363,3 +366,203 @@ class ChartParser(object):
             return tree, loss
         else:
             return tree, score
+
+class MyParser(object):
+    def __init__(
+            self,
+            model,
+            tag_vocab,
+            word_vocab,
+            char_vocab,
+            label_vocab,
+            tag_embedding_dim,
+            word_embedding_dim,
+            char_embedding_dim,
+            label_embedding_dim,
+            lstm_layers,
+            lstm_dim,
+            char_lstm_dim,
+            dec_lstm_dim,
+            attention_dim,
+            label_hidden_dim,
+            keep_valence_value,
+            dropouts,
+    ):
+        self.spec = locals()
+        self.spec.pop("self")
+        self.spec.pop("model")
+        self.model = model.add_subcollection("Parser")
+        self.tag_vocab = tag_vocab
+        self.word_vocab = word_vocab
+        self.label_vocab = label_vocab
+        self.char_vocab = char_vocab
+        self.keep_valence_value = keep_valence_value
+        self.lstm_dim = lstm_dim
+
+        self.tag_embeddings = self.model.add_lookup_parameters(
+            (tag_vocab.size, tag_embedding_dim))
+        self.word_embeddings = self.model.add_lookup_parameters(
+            (word_vocab.size, word_embedding_dim))
+
+        embedding_dim = tag_embedding_dim + word_embedding_dim + char_lstm_dim
+        self.enc_lstm = dy.BiRNNBuilder(
+            lstm_layers,
+            embedding_dim,
+            2 * lstm_dim,
+            self.model,
+            dy.VanillaLSTMBuilder)
+
+        self.char_embeddings = self.model.add_lookup_parameters(
+            (char_vocab.size, char_embedding_dim))
+
+        self.char_lstm = dy.LSTMBuilder(
+            1,
+            char_embedding_dim,
+            char_lstm_dim,
+            self.model)
+
+        self.label_embeddings = self.model.add_lookup_parameters(
+            (label_vocab.size, label_embedding_dim))
+
+        enc_out_dim = embedding_dim + 2 * lstm_dim
+        self.dec_lstm = dy.LSTMBuilder(
+            1,
+            label_embedding_dim + enc_out_dim,
+            dec_lstm_dim,
+            self.model)
+
+        dec_attend_dim = enc_out_dim + dec_lstm_dim
+        Weights = collections.namedtuple('Weights', 'name prev_dim next_dim')
+        ws = []
+        ws.append(Weights(name='key', prev_dim=enc_out_dim, next_dim=attention_dim))
+        ws.append(Weights(name='query', prev_dim=dec_lstm_dim, next_dim=attention_dim))
+        ws.append(Weights(name='probs', prev_dim=dec_lstm_dim, next_dim=label_vocab.size))
+        self.ws = {}
+        for w in ws:
+            weight = self.model.add_parameters((w.next_dim, w.prev_dim))
+            bias = self.model.add_parameters((w.next_dim))
+            self.ws[w.name] = (bias, weight)
+
+        Dropouts = collections.namedtuple('Dropouts', 'lstm embedding')
+        self.dropouts = Dropouts(lstm=dropouts[0], embedding=dropouts[1])
+
+    def param_collection(self):
+        return self.model
+
+    @classmethod
+    def from_spec(cls, spec, model):
+        return cls(model, **spec)
+
+    def parse(self, sentence, gold=None, is_dev=False, predict_parms=None):
+        is_train = gold is not None
+        use_dropout = is_train and not is_dev
+
+        if use_dropout:
+            dropouts = self.dropouts.embedding
+            self.enc_lstm.set_dropout(self.dropouts.lstm)
+            self.dec_lstm.set_dropout(self.dropouts.lstm)
+            self.char_lstm.set_dropout(self.dropouts.lstm)
+        else:
+            dropouts = 0.
+            self.enc_lstm.disable_dropout()
+            self.dec_lstm.disable_dropout()
+            self.char_lstm.disable_dropout()
+
+        embeddings = []
+        char_lstm = self.char_lstm.initial_state()
+        for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
+            chars_embedding = []
+            tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
+            tag_embedding = dy.dropout(tag_embedding, dropouts)
+            if word not in (START, STOP):
+                count = self.word_vocab.count(word)
+                if not count or (is_train and np.random.rand() < 1 / (1 + count)):
+                    word = UNK
+            for c in [START] + list(word) + [STOP]:
+                char_embedding = self.char_embeddings[self.char_vocab.index(c)]
+                char_embedding = dy.dropout(char_embedding, dropouts)
+                chars_embedding.append(char_embedding)
+            word_char_embedding = char_lstm.transduce(chars_embedding)[-1]
+            word_embedding = self.word_embeddings[self.word_vocab.index(word)]
+            word_embedding = dy.dropout(word_embedding, dropouts)
+            embeddings.append(dy.concatenate([tag_embedding, word_embedding, word_char_embedding]))
+        lstm_outputs = self.enc_lstm.transduce(embeddings)
+
+        encode_outputs_list = []
+        for e, l in zip(embeddings[1:-1], lstm_outputs[1:-1]):
+            encode_outputs_list.append(dy.concatenate([e, l]))
+
+        if is_train:
+            decode_inputs = [(START,) + tuple(leaf.labels) + (STOP,) for leaf in gold.leaves()]
+            losses = []
+            encode_outputs = dy.concatenate_cols(encode_outputs_list)
+
+            k = dy.affine_transform([*self.ws['key'], encode_outputs])
+            key = dy.transpose(dy.rectify(k))
+
+            for encode_output, decode_input in zip(encode_outputs_list, decode_inputs):
+
+                decode_output = []
+                for i,label in enumerate(decode_input[:-1]):
+                    e = self.label_embeddings[self.label_vocab.index(label)]
+                    le = dy.dropout(e, dropouts)
+                    if i == 0:
+                        s_dec = self.dec_lstm.initial_state()
+                        context = encode_output
+                    else:
+                        query = dy.affine_transform([*self.ws['query'], s_dec.output()])
+                        query = dy.rectify(query)
+                        alpha = dy.softmax(key * query)
+                        context = encode_outputs * alpha
+
+                    s_dec = s_dec.add_input(dy.concatenate([le, context]))
+                    decode_output.append(s_dec.output())
+                decode_output = dy.concatenate_cols(decode_output)
+                p = dy.affine_transform([*self.ws['probs'], decode_output])
+                probs = dy.softmax(p)
+
+                log_prob = []
+                for i, label in enumerate(decode_input[1:]):
+                    id = self.label_vocab.index(label)
+                    log_prob.append(-dy.log(dy.pick(dy.pick(probs, id), i)))
+                losses.extend(log_prob)
+
+            return None, losses
+
+        else:
+            import cProfile
+            profile = cProfile.Profile()
+
+            start = self.label_vocab.index(START)
+            stop = self.label_vocab.index(STOP)
+            astar_parms = predict_parms['astar_parms']
+            for beam_size in predict_parms['beam_parms']:
+                hyps = BeamSearch(start, stop, beam_size).beam_search(
+                                                            encode_outputs_list,
+                                                            self.label_embeddings,
+                                                            self.dec_lstm,
+                                                            self.ws)
+
+                grid = []
+                for i, (leaf_hyps, leaf) in enumerate(zip(hyps, sentence)):
+                    row = []
+                    for hyp in leaf_hyps:
+                        labels = np.array(self.label_vocab.values)[hyp[0]].tolist()
+                        partial_tree = trees.LeafMyParseNode(i, *leaf).deserialize(labels)
+                        if partial_tree is not None:
+                            row.append((partial_tree, hyp[1]))
+                    grid.append(row)
+
+
+                profile.enable()
+                nodes = astar_search(grid, self.keep_valence_value, astar_parms)
+                profile.disable()
+                # profile.print_stats()
+                profile.dump_stats('astar.prof')
+
+                if nodes != []:
+                    return nodes[0].trees[0], None
+
+            children = [trees.LeafMyParseNode(i, *leaf) for i,leaf in enumerate(sentence)]
+            tree = trees.InternalMyParseNode('S', children)
+            return tree, None
