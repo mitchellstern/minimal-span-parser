@@ -443,8 +443,8 @@ class MyParser(object):
             bias = self.model.add_parameters((w.next_dim))
             self.ws[w.name] = (bias, weight)
 
-        self.dropout = dropout
-        self.dropouts = dropouts
+        Dropouts = collections.namedtuple('Dropouts', 'lstm embedding')
+        self.dropouts = Dropouts(lstm=dropouts[0], embedding=dropouts[1])
 
     def param_collection(self):
         return self.model
@@ -458,33 +458,33 @@ class MyParser(object):
         use_dropout = is_train and not is_dev
 
         if use_dropout:
-            dropouts = self.dropouts
-            self.enc_lstm.set_dropout(dropouts[0])
-            self.char_lstm.set_dropout(dropouts[1])
-            self.dec_lstm.set_dropout(dropouts[2])
+            dropouts = self.dropouts.embedding
+            self.enc_lstm.set_dropout(self.dropouts.lstm)
+            self.dec_lstm.set_dropout(self.dropouts.lstm)
+            self.char_lstm.set_dropout(self.dropouts.lstm)
         else:
+            dropouts = 0.
             self.enc_lstm.disable_dropout()
             self.dec_lstm.disable_dropout()
             self.char_lstm.disable_dropout()
-            dropouts = [0.]*len(self.dropouts)
 
         embeddings = []
         char_lstm = self.char_lstm.initial_state()
         for tag, word in [(START, START)] + sentence + [(STOP, STOP)]:
             chars_embedding = []
             tag_embedding = self.tag_embeddings[self.tag_vocab.index(tag)]
-            tag_embedding = dy.dropout(tag_embedding, dropouts[3])
+            tag_embedding = dy.dropout(tag_embedding, dropouts)
             if word not in (START, STOP):
                 count = self.word_vocab.count(word)
                 if not count or (is_train and np.random.rand() < 1 / (1 + count)):
                     word = UNK
             for c in [START] + list(word) + [STOP]:
                 char_embedding = self.char_embeddings[self.char_vocab.index(c)]
-                char_embedding = dy.dropout(char_embedding, dropouts[4])
+                char_embedding = dy.dropout(char_embedding, dropouts)
                 chars_embedding.append(char_embedding)
             word_char_embedding = char_lstm.transduce(chars_embedding)[-1]
             word_embedding = self.word_embeddings[self.word_vocab.index(word)]
-            word_embedding = dy.dropout(word_embedding, dropouts[5])
+            word_embedding = dy.dropout(word_embedding, dropouts)
             embeddings.append(dy.concatenate([tag_embedding, word_embedding, word_char_embedding]))
         lstm_outputs = self.enc_lstm.transduce(embeddings)
 
@@ -505,7 +505,7 @@ class MyParser(object):
                 decode_output = []
                 for i,label in enumerate(decode_input[:-1]):
                     e = self.label_embeddings[self.label_vocab.index(label)]
-                    le = dy.dropout(e, dropouts[6])
+                    le = dy.dropout(e, dropouts)
                     if i == 0:
                         s_dec = self.dec_lstm.initial_state()
                         context = encode_output
